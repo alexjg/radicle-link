@@ -95,6 +95,12 @@ path = "../git-ext"
 [dependencies.radicle-git-helpers]
 path = "../git-helpers"
 
+[dependencies.link-identities]
+path = "../link-identities"
+
+[dependencies.cob]
+path = "../cob"
+
 [dependencies.rand]
 version = "0.7"
 features = [ "small_rng" ]
@@ -116,6 +122,10 @@ features = ["zeroize_derive"]
 version = "0.9.1"
 default-features = false
 features = ["local", "local-time-support"]
+
+[dependencies.automerge]
+git = "https://github.com/automerge/automerge-rs.git"
+branch = "main"
 
 [[bin]]
 name = "git-remote-rad"

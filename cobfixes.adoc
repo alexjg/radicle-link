@@ -1,0 +1,28 @@
+= Things to do to finish the cob work
+
+- Reject changes which have dependencies not listed in the parents of the change
+  commit
+- Check whether an author identity was ever a maintainer of a project, rather
+  than just if they are currently a maintainer.
+
+== Caching
+
+It seems we will need some kind of caching until automerge is faster. The reason
+for this is that for any given change graph we evalute every node of it on every
+change to an object or when retrieving any set of objects. What can we cache?
+
+When we're incorporating a change node into a change graph we do the following:
+
+- Check that the signatures of the change are valid
+- Check that the author of the commit is a maintainer of the project or identity
+- Check that the commit does not introduce a schema invalidating change
+
+Now, change graph nodes are immutable and cobs are CRDTs, so once we have
+validated a change graph node we shouldn't need to every evaluate it again. In
+principle then we could have a cached automerge binary document, then whenever
+we evaluate a new change we check if the change is in the automerge document and
+if it is we skip evaluating it. This means that we would basically call
+automerge::load once per object. This might be fast enough, if it isn't then we
+could also cache the json representation of it.
+
+

@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 8d454f914e775ae1c077aaed7799d63f31856859884166abf5d652d2b9963240 # shrinks to project_urn = Urn { id: Oid(4b825dc642cb6eb9a060e54bf8d69288fbee4904), path: None }, local_peer = hyy7swj7h345kemmnwqwpykuxbi3skcoiqhq6ro7g8myrtecmm8pn1, remote = hyy7swj7h345kemmnwqwpykuxbi3skcoiqhq6ro7g8myrtecmm8pn1, typename = TypeName("¡"), object_id = ObjectId(dcf5b16e76cce7425d0beaef62d79a7d10fce1f5)
