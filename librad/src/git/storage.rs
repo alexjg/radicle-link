@@ -16,6 +16,7 @@ use git2::string_array::StringArray;
 use git_ext::{self as ext, is_not_found_err};
 
 use crate::{
+    collaborative_objects::CollaborativeObjects,
     git::types::{Many, One, Reference},
     identities::git::Urn,
     paths::Paths,
@@ -222,6 +223,13 @@ impl Storage {
     fn fetchers(&self) -> &Fetchers {
         &self.fetchers
     }
+
+    pub fn collaborative_objects(
+        &self,
+        cache_dir: Option<std::path::PathBuf>,
+    ) -> CollaborativeObjects<'_> {
+        CollaborativeObjects::new(self.signer.clone(), self, self.as_raw(), cache_dir)
+    }
 }
 
 impl AsRef<Storage> for Storage {
@@ -271,6 +279,14 @@ impl ReadOnlyStorage for Storage {
         Oid: AsRef<git2::Oid> + Debug,
     {
         self.inner.find_object(oid)
+    }
+
+    fn find_commit(&self, oid: git2::Oid) -> Result<Option<git2::Commit<'_>>, Error> {
+        self.inner.find_commit(oid)
+    }
+
+    fn find_tree(&self, oid: git2::Oid) -> Result<Option<git2::Tree<'_>>, Error> {
+        self.inner.find_tree(oid)
     }
 
     fn tip(&self, urn: &Urn, kind: git2::ObjectType) -> Result<Option<git2::Object>, Error> {

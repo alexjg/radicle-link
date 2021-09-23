@@ -53,6 +53,9 @@ unicode-normalization = "0.1"
 url = "2.1"
 webpki = "0.21"
 
+[dependencies.cob]
+path = "../cob"
+
 [dependencies.git2]
 version = "0.13"
 default-features = false
