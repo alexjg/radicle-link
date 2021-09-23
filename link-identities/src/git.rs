@@ -26,7 +26,7 @@ pub mod iter;
 pub use generic::Verifying;
 
 mod load;
-mod sign;
+pub mod sign;
 
 use iter::Iter;
 use load::ByOid;
@@ -406,7 +406,7 @@ where
                 None,
                 &author,
                 &author,
-                &sign::CommitMessage::new(message, signatures).to_string(),
+                &sign::CommitMessage::new(message, signatures, None).to_string(),
                 &tree,
                 parents.iter().collect::<Vec<_>>().as_slice(),
             )
@@ -825,7 +825,7 @@ impl<'a> Identities<'a, Project> {
     }
 }
 
-fn sign<S>(signer: &S, rev: Revision) -> Result<Signature, S::Error>
+pub fn sign<S>(signer: &S, rev: git_ext::Oid) -> Result<Signature, S::Error>
 where
     S: Signer,
 {
