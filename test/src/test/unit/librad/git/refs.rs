@@ -180,3 +180,82 @@ mod verifying_refs {
         Signed::from_json(&serde_json::to_vec(&json).unwrap(), &peer).unwrap();
     }
 }
+
+mod computing_refs {
+    use librad::{
+        git::{refs::Refs, types::Namespace, Storage},
+        paths::Paths,
+        reflike,
+        SecretKey,
+    };
+    use radicle_git_ext::name as reference;
+
+    use crate::rad::identities::TestProject;
+
+    macro_rules! assert_refs {
+        ($iter: expr, [$($ref_str:literal => $expected_oid:expr)*]) => {
+            assert_eq!(
+                $iter.collect::<Vec<(&reference::OneLevel, radicle_git_ext::Oid)>>(),
+                vec![$((
+                    &reference::OneLevel::from(reflike!($ref_str)),
+                    $expected_oid.into()
+                )),+],
+            )
+        }
+    }
+
+    #[test]
+    fn test_compute_valid_refs() {
+        // Create a project and some storage
+        let project_dir = tempfile::TempDir::new().unwrap();
+        let paths = Paths::from_root(project_dir.path()).unwrap();
+        let key = SecretKey::new();
+        let storage = Storage::open(&paths, key).unwrap();
+        let project = TestProject::create(&storage).unwrap();
+
+
+        // Get raw access to the underlying repo so we can forcibly create some references
+        let raw_repo = git2::Repository::open(paths.git_dir()).unwrap();
+
+        // Create a bunch of blobs to create references to
+        let some_head = raw_repo.blob("some head".as_bytes()).unwrap();
+        let some_note = raw_repo.blob("some note".as_bytes()).unwrap();
+        let some_tag = raw_repo.blob("some tag".as_bytes()).unwrap();
+        let some_cob = raw_repo.blob("some cob".as_bytes()).unwrap();
+        let some_radid = raw_repo.blob("radid".as_bytes()).unwrap();
+        let some_otherblob = raw_repo.blob("some other blob".as_bytes()).unwrap();
+
+
+        // Create references in the places the Refs expects to look when computing itself
+        let namespace: Namespace<radicle_git_ext::Oid> = project.project.urn().into();
+        let namespace_prefix = format!("refs/namespaces/{}/refs/", namespace);
+        let refs_to_create = vec![
+            ("heads/somehead", some_head),
+            ("notes/somenote", some_note),
+            ("tags/sometag", some_tag),
+            ("cobs/somecob", some_cob),
+            ("rad/id", some_radid),
+            ("somecategory/something", some_otherblob),
+        ];
+
+        for (category, target) in refs_to_create {
+            raw_repo
+                .reference(
+                    format!("{}{}", namespace_prefix, category).as_str(),
+                    target,
+                    true,
+                    "",
+                )
+                .unwrap();
+        }
+
+        // Now assert that the computed refs are the ones we created
+        let refs = Refs::compute(&storage, &project.project.urn()).unwrap();
+        assert_refs!(refs.heads(), ["somehead" => some_head]);
+        assert_refs!(refs.rad(), ["id" => some_radid]);
+        assert_refs!(refs.tags(), ["sometag" => some_tag]);
+        assert_refs!(refs.notes(), ["somenote" => some_note]);
+        assert_refs!(refs.cobs(), ["somecob" => some_cob]);
+    }
+
+}

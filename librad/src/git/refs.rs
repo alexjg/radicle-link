@@ -446,6 +446,30 @@ impl Refs {
     fn canonical_form(&self) -> Result<Vec<u8>, CjsonError> {
         Cjson(self).canonical_form()
     }
+
+    /// References under 'refs/heads'
+    pub fn heads(&self) -> impl Iterator<Item=(&reference::OneLevel, Oid)> {
+        self.heads.iter().map(|(reference, oid)| (reference, *oid))
+    }
+
+    /// References under 'refs/rad'
+    pub fn rad(&self) -> impl Iterator<Item=(&reference::OneLevel, Oid)> {
+        self.rad.iter().map(|(reference, oid)| (reference, *oid))
+    }
+
+    /// References under 'refs/tags'
+    pub fn tags(&self) -> impl Iterator<Item=(&reference::OneLevel, Oid)> {
+        self.tags.iter().map(|(reference, oid)| (reference, *oid))
+    }
+
+    /// References under 'refs/notes'
+    pub fn notes(&self) -> impl Iterator<Item=(&reference::OneLevel, Oid)> {
+        self.notes.iter().map(|(reference, oid)| (reference, *oid))
+    }
+
+    pub fn cobs(&self) -> impl Iterator<Item=(&reference::OneLevel, Oid)> {
+        std::iter::empty()
+    }
 }
 
 impl<V> From<Signed<V>> for Refs {
