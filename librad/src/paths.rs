@@ -22,6 +22,7 @@ pub struct Paths {
     git_dir: PathBuf,
     git_includes_dir: PathBuf,
     cob_cache_dir: PathBuf,
+    socket_dir: PathBuf,
 }
 
 impl Paths {
@@ -34,12 +35,19 @@ impl Paths {
         let config_dir = proj.config_dir().join(profile_id);
         let data_dir = proj.data_dir().join(profile_id);
         let cache_dir = proj.cache_dir().join(profile_id);
+        // On linux this will return the value of $XDG_RUNTIME_DIR, on OSX there is no
+        // specified runtime directory so we use <data directory>/sockets
+        let socket_dir = proj
+            .runtime_dir()
+            .map(|p| p.join(profile_id))
+            .unwrap_or_else(|| data_dir.join("sockets"));
 
         Self {
             keys_dir: config_dir.join("keys"),
             git_dir: data_dir.join("git"),
             git_includes_dir: config_dir.join("git-includes"),
             cob_cache_dir: cache_dir.join("cob-cache"),
+            socket_dir,
         }
         .init()
     }
@@ -52,6 +60,7 @@ impl Paths {
             git_dir: root.join("git"),
             git_includes_dir: root.join("git-includes"),
             cob_cache_dir: root.join("cob-cache"),
+            socket_dir: root.join("sockets"),
         }
         .init()
     }
@@ -80,6 +89,7 @@ impl Paths {
             git_dir,
             git_includes_dir,
             cob_cache_dir,
+            socket_dir,
         } = self;
 
         vec![
@@ -87,6 +97,7 @@ impl Paths {
             git_dir.as_path(),
             git_includes_dir.as_path(),
             cob_cache_dir.as_path(),
+            socket_dir.as_path(),
         ]
         .into_iter()
     }
@@ -94,6 +105,14 @@ impl Paths {
     fn init(self) -> Result<Self, io::Error> {
         self.all_dirs().try_for_each(fs::create_dir_all)?;
         Ok(self)
+    }
+
+    pub fn api_socket(&self) -> PathBuf {
+        self.socket_dir.join("api")
+    }
+
+    pub fn events_socket(&self) -> PathBuf {
+        self.socket_dir.join("events")
     }
 }
 
