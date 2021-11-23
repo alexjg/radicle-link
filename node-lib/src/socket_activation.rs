@@ -3,7 +3,7 @@
 // This file is part of radicle-link, distributed under the GPLv3 with Radicle
 // Linking Exception. For full terms see the included LICENSE file.
 
-use std::os::unix::net::UnixListener;
+use tokio::net::UnixListener;
 
 use anyhow::Result;
 
@@ -17,16 +17,24 @@ mod unix;
 #[cfg(all(unix, not(target_os = "macos")))]
 use unix as imp;
 
-/// Constructs a Unix socket from the file descriptor passed through the
-/// environemnt. The returned listener will be `None` if there are no
-/// environment variables set that are applicable for the current platform or no
-/// suitable implementations are activated/supported:
+/// Sockets used to activate the service
+pub struct Sockets {
+    /// The socket applications will connect to the API over
+    pub api: UnixListener,
+    /// The socket applications will publish and consume events over
+    pub events: UnixListener,
+}
+
+/// Constructs a `Sockets` from the file descriptors passed through the
+/// environemnt. The result will be `None` if there are no environment variables
+/// set that are applicable for the current platform or no suitable
+/// implementations are activated/supported:
 ///
 /// * [systemd] under unix systems with an OS other than macos
 /// * [launchd] under macos
 ///
 /// [systemd]: https://www.freedesktop.org/software/systemd/man/systemd.socket.html
 /// [launchd]: https://en.wikipedia.org/wiki/Launchd#Socket_activation_protocol
-pub fn env() -> Result<Option<UnixListener>> {
+pub fn env() -> Result<Option<Sockets>> {
     imp::env()
 }

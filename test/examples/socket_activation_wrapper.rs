@@ -8,17 +8,8 @@ use nix::{sys::socket, unistd::Pid};
 use std::{fs::remove_file, os::unix::process::CommandExt as _, process::Command};
 
 fn main() -> Result<()> {
-    remove_file("/tmp/test-linkd-socket-activation.sock").ok();
-
-    let sock = socket::socket(
-        socket::AddressFamily::Unix,
-        socket::SockType::Stream,
-        socket::SockFlag::empty(),
-        None,
-    )?;
-    let addr = socket::SockAddr::new_unix("/tmp/test-linkd-socket-activation.sock")?;
-    socket::bind(sock, &addr)?;
-    socket::listen(sock, 1)?;
+    make_sock("api")?;
+    make_sock("events")?;
 
     let mut cmd = Command::new("cargo");
     cmd.arg("run")
@@ -26,9 +17,26 @@ fn main() -> Result<()> {
         .arg("radicle-link-test")
         .arg("--example")
         .arg("socket_activation");
-    cmd.env("LISTEN_FDS", "1");
+    cmd.env("LISTEN_FDS", "2");
+    cmd.env("LISTEN_FDNAMES", "api:events");
     cmd.env("LISTEN_PID", Pid::this().to_string());
     cmd.exec();
 
+    Ok(())
+}
+
+fn make_sock(name: &str) -> Result<()> {
+    let sock_name = format!("/tmp/test-linkd-socket-activation-{}.sock", name);
+    remove_file(sock_name.as_str()).ok();
+
+    let sock = socket::socket(
+        socket::AddressFamily::Unix,
+        socket::SockType::Stream,
+        socket::SockFlag::empty(),
+        None,
+    )?;
+    let addr = socket::SockAddr::new_unix(sock_name.as_str())?;
+    socket::bind(sock, &addr)?;
+    socket::listen(sock, 1)?;
     Ok(())
 }

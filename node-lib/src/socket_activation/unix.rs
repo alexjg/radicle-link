@@ -21,34 +21,98 @@ use nix::{
     sys::socket::SockAddr,
     unistd::Pid,
 };
+use tokio::net::UnixListener as TokioUnixListener;
+
+use super::Sockets;
 
 /// Environemnt variable which carries the amount of file descriptors passed
 /// down.
 const LISTEN_FDS: &str = "LISTEN_FDS";
 /// Environment variable containing colon-separated list of names corresponding
 /// to the `FileDescriptorName` option in the service file.
-const _LISTEN_NAMES: &str = "LISTEN_NAMES";
+const LISTEN_NAMES: &str = "LISTEN_FDNAMES";
 /// Environemnt variable when present should match PID of the current process.
 const LISTEN_PID: &str = "LISTEN_PID";
+/// The name of the api socket
+const API_SOCKET_FD_NAME: &str = "api";
+/// The name of the events socket
+const EVENTS_SOCKET_FD_NAME: &str = "events";
 
-pub fn env() -> Result<Option<UnixListener>> {
-    // TODO(xla): Enable usage of more than the first fd. For now the assumption
-    // should be safe as long as the service files are defined in accordance.
-    if let Some(fd) = fds().and_then(|fds| fds.first().cloned()) {
-        if !matches!(nix::sys::socket::getsockname(fd)?, SockAddr::Unix(_)) {
-            bail!(
-                "file descriptor {} taken from env is not a valid unix socket",
-                fd
-            );
-        }
+pub fn env() -> Result<Option<Sockets>> {
+    match (fds(), fd_names()) {
+        (Some(fds), Some(fd_names)) => {
+            let api_socket_idx = fd_names
+                .iter()
+                .position(|n| n == API_SOCKET_FD_NAME)
+                .ok_or_else(|| {
+                    anyhow::anyhow!("did not find '{}' in {}", API_SOCKET_FD_NAME, LISTEN_NAMES)
+                })?;
 
-        // Set FD_CLOEXEC to avoid further inheritance to children.
-        fcntl(fd, F_SETFD(FdFlag::FD_CLOEXEC))?;
+            let events_socket_idx = fd_names
+                .iter()
+                .position(|n| n == EVENTS_SOCKET_FD_NAME)
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "did not find '{}' in {}",
+                        EVENTS_SOCKET_FD_NAME,
+                        LISTEN_NAMES
+                    )
+                })?;
 
-        return Ok(Some(unsafe { FromRawFd::from_raw_fd(fd) }));
+            let api_socket = load_socket(api_socket_idx, API_SOCKET_FD_NAME, &fds)?;
+            let events_socket = load_socket(events_socket_idx, EVENTS_SOCKET_FD_NAME, &fds)?;
+            Ok(Some(Sockets {
+                api: api_socket,
+                events: events_socket,
+            }))
+        },
+        (Some(_), None) => {
+            tracing::warn!("LISTEN_FDS is set but LISTEN_FDNAMES is not");
+            Ok(None)
+        },
+        (None, Some(_)) => {
+            tracing::warn!("LISTEN_FDNAMES is set but LISTEN_FDS is not");
+            Ok(None)
+        },
+        _ => Ok(None),
+    }
+}
+
+fn load_socket(idx: usize, name: &str, fds: &[RawFd]) -> Result<TokioUnixListener> {
+    let fd = *fds.get(idx).ok_or_else(|| {
+        anyhow::anyhow!(
+            "no file descriptor for index {} (corresponding to {}
+            in {}) in {}",
+            idx,
+            name,
+            LISTEN_NAMES,
+            LISTEN_FDS,
+        )
+    })?;
+
+    if !matches!(nix::sys::socket::getsockname(fd)?, SockAddr::Unix(_)) {
+        bail!(
+            "file descriptor {} taken from env is not a valid unix socket",
+            fd
+        );
     }
 
-    Ok(None)
+    // Set FD_CLOEXEC to avoid further inheritance to children.
+    fcntl(fd, F_SETFD(FdFlag::FD_CLOEXEC))?;
+
+    let std_listener: UnixListener = unsafe { FromRawFd::from_raw_fd(fd) };
+    std_listener.set_nonblocking(true)?;
+    // Note that this panics if there is no thread local tokio runtime. Should we
+    // warn about this at an earlier point?
+    Ok(TokioUnixListener::from_std(std_listener)?)
+}
+
+fn fd_names() -> Option<Vec<String>> {
+    if let Ok(fd_names) = env::var(LISTEN_NAMES) {
+        Some(fd_names.split(':').map(String::from).collect())
+    } else {
+        None
+    }
 }
 
 fn fds() -> Option<Vec<RawFd>> {
