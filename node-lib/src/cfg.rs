@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use tokio::{
     fs::File,
     io::{stdin, AsyncReadExt as _},
@@ -19,7 +19,17 @@ use tokio::{
 use tracing::warn;
 
 use librad::{
-    crypto::{BoxedSigner, IntoSecretKeyError},
+    crypto::{
+        keystore::{
+            crypto::{KdfParams, Pwhash},
+            pinentry::SecUtf8,
+            FileStorage,
+            Keystore as _,
+        },
+        BoxedSigner,
+        IntoSecretKeyError,
+        PublicKey,
+    },
     git::storage,
     keystore::SecretKeyExt as _,
     net,
@@ -193,20 +203,29 @@ async fn construct_signer(args: &args::Args, profile: &Profile) -> anyhow::Resul
                     SecretKey::new().as_ref().to_vec()
                 },
                 args::KeySource::File => {
-                    if args.key.file_path.is_none() {
-                        bail!("file path must be present when file source is set");
+                    let key_file_path = args.key.file_path.as_ref().ok_or_else(|| {
+                        anyhow::anyhow!("file path must be present when file source is set")
+                    })?;
+
+                    if let Some(passphrase) = &args.key.file_passphrase {
+                        let sec_passphrase: SecUtf8 = passphrase.to_string().into();
+                        let crypto = Pwhash::new(sec_passphrase, KdfParams::recommended());
+                        let store: FileStorage<_, PublicKey, SecretKey, _> =
+                            FileStorage::new(key_file_path, crypto);
+                        let key = store.get_key().map(|pair| pair.secret_key)?;
+                        key.as_ref().to_vec()
+                    } else {
+                        let mut file = File::open(key_file_path)
+                            .await
+                            .context("opening key file")?;
+                        let mut bytes = vec![];
+
+                        timeout(Duration::from_secs(5), file.read_to_end(&mut bytes))
+                            .await?
+                            .context("reading key file")?;
+
+                        bytes
                     }
-
-                    let mut file = File::open(args.key.file_path.clone().unwrap())
-                        .await
-                        .context("opening key file")?;
-                    let mut bytes = vec![];
-
-                    timeout(Duration::from_secs(5), file.read_to_end(&mut bytes))
-                        .await?
-                        .context("reading key file")?;
-
-                    bytes
                 },
                 args::KeySource::Stdin => {
                     let mut bytes = vec![];

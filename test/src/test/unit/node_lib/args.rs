@@ -240,6 +240,7 @@ fn signer_key_file() -> Result<()> {
             "--key-format", "base64",
             "--key-source", "file",
             "--key-file-path", "~/.config/radicle/secret.seed",
+            "--key-file-passphrase", "1234",
     ];
     let parsed = Args::from_iter_safe(iter)?;
     assert_eq!(
@@ -250,6 +251,7 @@ fn signer_key_file() -> Result<()> {
                 format: args::KeyFormat::Base64,
                 source: args::KeySource::File,
                 file_path: Some(PathBuf::from("~/.config/radicle/secret.seed")),
+                file_passphrase: Some("1234".to_string()),
             },
             ..Default::default()
         }
@@ -298,6 +300,7 @@ fn signer_key_ephemeral() -> Result<()> {
                 format: args::KeyFormat::Base64,
                 source: args::KeySource::File,
                 file_path: Some(PathBuf::from("~/.config/radicle/secret.seed")),
+                file_passphrase: None,
             },
             ..Default::default()
         }

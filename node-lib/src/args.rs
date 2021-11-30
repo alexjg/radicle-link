@@ -149,6 +149,9 @@ pub struct KeyArgs {
         required_if("key-source", "file")
     )]
     pub file_path: Option<PathBuf>,
+    /// Passphrase to decrypt an encrypted key file
+    #[structopt(long = "key-file-passphrase", name = "key-file-passphrase")]
+    pub file_passphrase: Option<String>,
     /// Format of the key input data.
     #[structopt(
         long = "key-format",
