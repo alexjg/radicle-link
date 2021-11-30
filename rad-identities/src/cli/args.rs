@@ -84,6 +84,8 @@ pub struct Refs {
 }
 
 pub mod project {
+    use librad::git::types::Pushspec;
+
     use super::*;
 
     fn project_payload(value: &str) -> Result<payload::Project, String> {
@@ -113,6 +115,7 @@ pub mod project {
         Diff(Diff),
         Accept(Accept),
         Tracked(Tracked),
+        Push(Push),
     }
 
     /// create a new Radicle project, either with a fresh working copy or based
@@ -297,6 +300,19 @@ pub mod project {
         /// the Radicle URN of the project
         #[structopt(long)]
         pub urn: Urn,
+    }
+
+    /// Push the contents of a local repository to the monorepo and notify the
+    /// p2p node
+    #[derive(Debug, StructOpt)]
+    pub struct Push {
+        /// What to push
+        #[structopt(long)]
+        pub spec: Pushspec,
+        /// The directory containing the repo to push, uses the current working
+        /// directory if not specified
+        #[structopt(long)]
+        pub repo_path: Option<PathBuf>,
     }
 }
 

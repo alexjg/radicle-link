@@ -3,7 +3,12 @@
 // This file is part of radicle-link, distributed under the GPLv3 with Radicle
 // Linking Exception. For full terms see the included LICENSE file.
 
-use std::{collections::BTreeSet, convert::TryFrom as _, path::PathBuf};
+use std::{
+    collections::BTreeSet,
+    convert::TryFrom as _,
+    os::unix::net::UnixStream,
+    path::{Path, PathBuf},
+};
 
 use either::Either;
 use thiserror::Error;
@@ -14,7 +19,7 @@ use librad::{
         identities::{self, local::LocalIdentity, project, relations, Project},
         local::{transport, url::LocalUrl},
         storage::{ReadOnly, Storage},
-        types::{Namespace, Reference},
+        types::{Namespace, Pushspec, Reference},
         Urn,
     },
     identities::{
@@ -29,7 +34,7 @@ use librad::{
 
 use crate::{
     display,
-    git::{self, checkout, include},
+    git::{self, checkout, include, push},
     MissingDefaultIdentity,
 };
 
@@ -60,6 +65,12 @@ pub enum Error {
 
     #[error(transparent)]
     Relations(Box<relations::Error>),
+
+    #[error(transparent)]
+    Push(#[from] push::Error),
+
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 impl From<relations::Error> for Error {
@@ -281,4 +292,40 @@ where
     // ensure that the URN exists and is indeed a project
     let _guard = get(storage, urn)?.ok_or_else(|| identities::Error::NotFound(urn.clone()))?;
     Ok(identities::relations::tracked(storage, urn)?)
+}
+
+pub fn push<P>(
+    paths: &Paths,
+    signer: BoxedSigner,
+    repo_path: P,
+    spec: Pushspec,
+) -> Result<(), Error>
+where
+    P: AsRef<Path>,
+{
+    let settings = transport::Settings {
+        paths: paths.clone(),
+        signer,
+    };
+    let (urn, updated_refs) = git::push::push(settings, repo_path, spec)?;
+    let messages = updated_refs.map(|updated_branch| {
+        let git::push::UpdatedBranch { branch, oid } = updated_branch;
+        node_lib::api::wire_types::events::Envelope {
+            message: Some(node_lib::api::wire_types::events::Message::PostReceive(
+                node_lib::api::wire_types::events::PostReceive {
+                    urn: urn.clone().with_path(branch),
+                    rev: oid.into(),
+                },
+            )),
+        }
+    });
+    let event_socket = paths.events_socket();
+    let stream = UnixStream::connect(event_socket)?;
+    for message in messages {
+        minicbor::encode(message, &stream).map_err(|e| {
+            let msg = format!("error writing message to p2p socket: {}", e);
+            Error::Io(std::io::Error::new(std::io::ErrorKind::Other, msg))
+        })?;
+    }
+    Ok(())
 }

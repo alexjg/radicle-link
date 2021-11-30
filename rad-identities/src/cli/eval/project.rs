@@ -11,7 +11,7 @@ use librad::{
     git::{
         identities,
         storage::ReadOnly,
-        types::{Namespace, Reference},
+        types::{Namespace, Pushspec, Reference},
         Urn,
     },
     identities::{
@@ -48,6 +48,7 @@ pub fn eval(profile: &Profile, sock: SshAuthSock, opts: Options) -> anyhow::Resu
             eval_accept(profile, sock, urn, peer, force)?
         },
         Options::Tracked(Tracked { urn }) => eval_tracked(profile, urn)?,
+        Options::Push(Push { repo_path, spec }) => eval_push(profile, sock, repo_path, spec)?,
     }
 
     Ok(())
@@ -263,4 +264,16 @@ where
             .header(&format!("ours @ {}", local), &format!("theirs @ {}", peer))
     );
     Ok(())
+}
+
+fn eval_push(
+    profile: &Profile,
+    sock: SshAuthSock,
+    path: Option<PathBuf>,
+    spec: Pushspec,
+) -> anyhow::Result<()> {
+    let (signer, _) = ssh::storage(profile, sock)?;
+    let paths = profile.paths();
+    let path = path.map(Ok).unwrap_or_else(std::env::current_dir)?;
+    Ok(project::push(paths, signer, path, spec)?)
 }
