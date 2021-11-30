@@ -23,7 +23,7 @@ use nix::{
 };
 use tokio::net::UnixListener as TokioUnixListener;
 
-use super::Sockets;
+use super::{OpenMode, Sockets};
 
 /// Environemnt variable which carries the amount of file descriptors passed
 /// down.
@@ -64,6 +64,7 @@ pub fn env() -> Result<Option<Sockets>> {
             Ok(Some(Sockets {
                 api: api_socket,
                 events: events_socket,
+                open_mode: OpenMode::SocketActivated,
             }))
         },
         (Some(_), None) => {

@@ -3,6 +3,7 @@
 // This file is part of radicle-link, distributed under the GPLv3 with Radicle
 // Linking Exception. For full terms see the included LICENSE file.
 
+use librad::profile::Profile;
 use tokio::net::UnixListener;
 
 use anyhow::Result;
@@ -17,13 +18,7 @@ mod unix;
 #[cfg(all(unix, not(target_os = "macos")))]
 use unix as imp;
 
-/// Sockets used to activate the service
-pub struct Sockets {
-    /// The socket applications will connect to the API over
-    pub api: UnixListener,
-    /// The socket applications will publish and consume events over
-    pub events: UnixListener,
-}
+use super::{OpenMode, Sockets};
 
 /// Constructs a `Sockets` from the file descriptors passed through the
 /// environemnt. The result will be `None` if there are no environment variables
@@ -37,4 +32,19 @@ pub struct Sockets {
 /// [launchd]: https://en.wikipedia.org/wiki/Launchd#Socket_activation_protocol
 pub fn env() -> Result<Option<Sockets>> {
     imp::env()
+}
+
+/// Constructs a `Sockets` from the file descriptors at default locations with
+/// respect to the profile passed in
+pub fn profile(profile: &Profile) -> Result<Sockets> {
+    let api = UnixListener::bind(profile.paths().api_socket())?;
+    let events = UnixListener::bind(profile.paths().events_socket())?;
+    Ok(Sockets {
+        api,
+        events,
+        open_mode: OpenMode::InProcess {
+            api_socket_path: profile.paths().api_socket(),
+            event_socket_path: profile.paths().events_socket(),
+        },
+    })
 }

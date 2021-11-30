@@ -13,7 +13,9 @@ test    = false
 
 [dependencies]
 anyhow              = "1.0"
+async-compat        = "0.2.1"
 base64              = "0.13"
+futures_codec       = "0.4.1"
 env_logger          = "0.9"
 futures             = "0.3"
 lazy_static         = "1.4"
@@ -29,6 +31,13 @@ tracing             = { version = "0.1", default-features = false, features = [ 
 path    = "../librad"
 version = "0.1.0"
 
+[dependencies.link-async]
+path = "../link-async"
+
+[dependencies.minicbor]
+version = "0.9.1"
+features = ["std", "derive"]
+
 [dependencies.rad-clib]
 path    = "../rad-clib"
 version = "0.1.0"
@@ -41,3 +50,11 @@ branch    = "generic-agent"
 [dependencies.tracing-subscriber]
 version = "0.3.0"
 features = ["std", "env-filter", "fmt", "json"]
+
+[dependencies.radicle-git-ext]
+path = "../git-ext"
+
+[dependencies.git2]
+version = "=0.13.20"
+default-features = false
+features = []
