@@ -58,3 +58,10 @@ default-features = false
 [dependencies.url]
 version = "2.1"
 features = ["serde"]
+
+[dependencies.node-lib]
+path = "../node-lib"
+
+[dependencies.minicbor]
+version = "0.9.1"
+features = ["std", "derive"]

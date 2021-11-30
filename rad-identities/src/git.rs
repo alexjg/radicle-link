@@ -31,6 +31,7 @@ pub mod checkout;
 pub mod existing;
 pub mod include;
 pub mod new;
+pub mod push;
 
 lazy_static! {
     pub static ref MAIN_BRANCH: OneLevel = OneLevel::from(reflike!("main"));
