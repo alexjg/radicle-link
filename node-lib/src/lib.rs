@@ -8,12 +8,10 @@ pub mod args;
 mod cfg;
 pub use cfg::{Seed, Seeds};
 
+pub mod api;
 mod logging;
 mod metrics;
 pub mod node;
 mod protocol;
 mod signals;
 mod tracking;
-
-#[cfg(unix)]
-pub mod socket_activation;
