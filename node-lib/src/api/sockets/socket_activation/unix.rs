@@ -22,7 +22,7 @@ use nix::{
     unistd::Pid,
 };
 
-use super::Sockets;
+use super::{OpenMode, SyncSockets};
 
 /// Environemnt variable which carries the amount of file descriptors passed
 /// down.
@@ -32,19 +32,19 @@ const LISTEN_FDS: &str = "LISTEN_FDS";
 const LISTEN_NAMES: &str = "LISTEN_FDNAMES";
 /// Environemnt variable when present should match PID of the current process.
 const LISTEN_PID: &str = "LISTEN_PID";
-/// The name of the api socket
-const API_SOCKET_FD_NAME: &str = "api";
+/// The name of the rpc socket
+const RPC_SOCKET_FD_NAME: &str = "rpc";
 /// The name of the events socket
 const EVENTS_SOCKET_FD_NAME: &str = "events";
 
-pub fn env() -> Result<Option<Sockets>> {
+pub(super) fn env() -> Result<Option<SyncSockets>> {
     match (fds(), fd_names()) {
         (Some(fds), Some(fd_names)) => {
-            let api_socket_idx = fd_names
+            let rpc_socket_idx = fd_names
                 .iter()
-                .position(|n| n == API_SOCKET_FD_NAME)
+                .position(|n| n == RPC_SOCKET_FD_NAME)
                 .ok_or_else(|| {
-                    anyhow::anyhow!("did not find '{}' in {}", API_SOCKET_FD_NAME, LISTEN_NAMES)
+                    anyhow::anyhow!("did not find '{}' in {}", RPC_SOCKET_FD_NAME, LISTEN_NAMES)
                 })?;
 
             let events_socket_idx = fd_names
@@ -58,11 +58,12 @@ pub fn env() -> Result<Option<Sockets>> {
                     )
                 })?;
 
-            let api_socket = load_socket(api_socket_idx, API_SOCKET_FD_NAME, &fds)?;
+            let rpc_socket = load_socket(rpc_socket_idx, RPC_SOCKET_FD_NAME, &fds)?;
             let events_socket = load_socket(events_socket_idx, EVENTS_SOCKET_FD_NAME, &fds)?;
-            Ok(Some(Sockets {
-                api: api_socket,
+            Ok(Some(SyncSockets {
+                rpc: rpc_socket,
                 events: events_socket,
+                open_mode: OpenMode::SocketActivated,
             }))
         },
         (Some(_), None) => {

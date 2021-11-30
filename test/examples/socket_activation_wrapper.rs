@@ -18,7 +18,7 @@ fn main() -> Result<()> {
         .arg("--example")
         .arg("socket_activation");
     cmd.env("LISTEN_FDS", "2");
-    cmd.env("LISTEN_FDNAMES", "api:events");
+    cmd.env("LISTEN_FDNAMES", "rpc:events");
     cmd.env("LISTEN_PID", Pid::this().to_string());
     cmd.exec();
 
