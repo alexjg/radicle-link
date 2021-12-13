@@ -1,0 +1,58 @@
+[package]
+name = "git-server"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+
+[dependencies]
+anyhow = "1.0"
+thiserror = "1.0"
+futures = "0.3"
+clap = "2.33"
+globset = "0.4"
+tracing = "0.1"
+regex = "1.5.4"
+multibase = "0.9"
+multihash = "0.11"
+
+[dependencies.git2]
+version = ">= 0.13.23"
+default-features = false
+features = ["vendored-libgit2"]
+
+[dependencies.librad]
+path = "../librad"
+
+[dependencies.link-async]
+path = "../link-async"
+
+[dependencies.node-lib]
+path = "../node-lib"
+
+[dependencies.rad-clib]
+path    = "../rad-clib"
+
+[dependencies.radicle-git-ext]
+path = "../git-ext"
+
+[dependencies.structopt]
+version = "0.3"
+default-features = false
+
+[dependencies.tokio]
+version = "1.10"
+default-features = false
+features = [ "fs", "io-std", "macros", "process", "rt-multi-thread", "signal" ]
+
+[dependencies.thrussh]
+git = "https://github.com/FintanH/thrussh"
+branch = "generic-agent"
+
+[dependencies.thrussh-keys]
+git = "https://github.com/FintanH/thrussh"
+branch = "generic-agent"
+
+[dependencies.tracing-subscriber]
+version = "0.3.0"
+features = ["std", "env-filter", "fmt", "json"]

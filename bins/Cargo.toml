@@ -1,11 +1,16 @@
 [workspace]
 members = [
   "linkd",
+  "linkd-git",
   "rad",
   "rad-identities-dev",
   "rad-profile-dev",
 ]
 
 [patch.crates-io.thrussh-encoding]
+git = "https://github.com/FintanH/thrussh.git"
+branch = "generic-agent"
+
+[patch.crates-io.thrussh-agent]
 git = "https://github.com/FintanH/thrussh.git"
 branch = "generic-agent"

@@ -16,7 +16,7 @@ use librad::{
     PeerId,
     Signer,
 };
-use link_async::Spawner;
+use link_async::{Spawner, incoming::UnixListenerExt};
 
 use super::{
     codec,
@@ -32,7 +32,7 @@ pub fn tasks<S>(
 where
     S: Signer + Clone,
 {
-    let incoming = Incoming(socket);
+    let incoming = socket.incoming();
     incoming
         .map(move |stream| match stream {
             Ok(stream) => {
@@ -99,27 +99,6 @@ where
     tracing::info!("connection closing");
 
     Ok(())
-}
-
-// Copied from async_std::os::unix::net::Incoming
-struct Incoming<'a>(&'a UnixListener);
-
-impl<'a> futures::stream::Stream for Incoming<'a> {
-    type Item = std::io::Result<UnixStream>;
-
-    fn poll_next(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Option<Self::Item>> {
-        match self.0.poll_accept(cx) {
-            std::task::Poll::Ready(Ok((socket, _))) => std::task::Poll::Ready(Some(Ok(socket))),
-            std::task::Poll::Ready(Err(e)) => {
-                tracing::error!(err=?e, "error accepting socket");
-                std::task::Poll::Ready(None)
-            },
-            std::task::Poll::Pending => std::task::Poll::Pending,
-        }
-    }
 }
 
 fn mk_gossip(peer_id: PeerId, urn: &Urn, revision: &radicle_git_ext::Oid) -> gossip::Payload {

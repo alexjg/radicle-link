@@ -1,0 +1,30 @@
+= Making the node-lib
+
+== Done
+
+== Doing
+
+== Todo
+
+* Move `Handler` impl to a new struct (`GitHandler`?) which represents a
+  connection from a single `git` invocation.
+* Every time a new `exec` request comes in, instantiate a `GitExec` struct which
+  tracks the service requested and the channel ID it is for. Store the `GitExec`
+  in the `GitHandler` in a `HashMap<ChannelId, GitHandler>`.
+* Write an asynchronous version of `LocalTransport::connect` using
+  `tokio::process`. Maybe call this `async_transport`?
+* Every time we receive data in `Handler::data()` we check what handler it is
+  for by looking up the channel ID and pass the data on to `async_transport`.
+  Likewise whenever `async_transport` produces data we need to send it down the
+  pipe using `Session::data`.
+* Implement a `Progress` RPC message reporting incremental progress in handling
+  a call
+* Implement a `wants-response` flag on `rpc::RequestEnvelop` so clients can fire
+  and forget
+
+== RFC Changes
+
+* Specify socket locations
+* Add announce RPC message
+
+

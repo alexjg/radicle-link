@@ -6,6 +6,7 @@ members = [
   "e2e",
   "git-ext",
   "git-helpers",
+  "git-server",
   "git-trailers",
   "librad",
   "link-async",
@@ -29,5 +30,9 @@ exclude = [
 ]
 
 [patch.crates-io.thrussh-encoding]
+git = "https://github.com/FintanH/thrussh.git"
+branch = "generic-agent"
+
+[patch.crates-io.thrussh-agent]
 git = "https://github.com/FintanH/thrussh.git"
 branch = "generic-agent"

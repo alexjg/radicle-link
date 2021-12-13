@@ -73,7 +73,7 @@ impl RpcClient for SocketRpcClient {
         if let Some(envelope) = envelope {
             match envelope.response {
                 Some(rpc::ResponsePayload::AnnounceSuccess) => Ok(()),
-                Some(rpc::ResponsePayload::Error { description, .. }) => {
+                Some(rpc::ResponsePayload::Error { message: description, .. }) => {
                     Err(Self::Error::RpcError(description))
                 },
                 None => Err(Self::Error::UnknownMessage),

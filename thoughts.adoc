@@ -1,0 +1,2 @@
+- Is there anything stopping someone using "0" as a type name in unnamed field
+  enums

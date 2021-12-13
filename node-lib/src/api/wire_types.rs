@@ -20,6 +20,7 @@ pub mod rpc {
     #[cbor(map)]
     pub enum RequestPayload {
         #[n(0)]
+        #[cbor(map)]
         Announce {
             #[n(0)]
             urn: Urn,
@@ -42,9 +43,10 @@ pub mod rpc {
         #[n(0)]
         AnnounceSuccess,
         #[n(1)]
+        #[cbor(map)]
         Error {
             #[n(0)]
-            description: String,
+            message: String,
             #[n(1)]
             kind: Option<ErrorKind>,
         },
@@ -55,7 +57,7 @@ pub mod rpc {
     pub enum ErrorKind {
         /// Some error occurred
         #[n(0)]
-        Generic,
+        Internal,
     }
 
     #[derive(minicbor::Decode, minicbor::Encode)]
