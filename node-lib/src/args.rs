@@ -18,7 +18,7 @@ use librad::{
     profile::{ProfileId, RadHome},
     PeerId,
 };
-use rad_clib::keys::ssh::SshAuthSock;
+use lnk_clib::keys::ssh::SshAuthSock;
 
 #[derive(Debug, Default, Eq, PartialEq, StructOpt)]
 pub struct Args {

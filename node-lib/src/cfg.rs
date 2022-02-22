@@ -27,7 +27,7 @@ use librad::{
     profile::{Profile, RadHome},
     SecretKey,
 };
-use rad_clib::keys;
+use lnk_clib::keys;
 
 use crate::{args, tracking::Tracker};
 
