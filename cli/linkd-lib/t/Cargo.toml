@@ -46,6 +46,9 @@ features = ["test"]
 [dependencies.test-helpers]
 path = "../../../test/test-helpers"
 
+[dependencies.lnk-sock-activation]
+path = "../../lnk-sock-activation"
+
 [dev-dependencies]
 anyhow = "1"
 assert_cmd = "2"

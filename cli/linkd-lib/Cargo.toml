@@ -40,6 +40,9 @@ version = "0.1.0"
 [dependencies.link-async]
 path = "../../link-async"
 
+[dependencies.lnk-sock-activation]
+path = "..//lnk-sock-activation"
+
 [dependencies.minicbor]
 version = "0.13"
 features = ["std", "derive"]
