@@ -75,3 +75,7 @@ path = "../cli/lnk-identities/t"
 [dev-dependencies.linkd-lib-test]
 path = "../cli/linkd-lib/t"
 features = ["test"]
+
+[dependencies.lnk-socket-activation]
+path = "../cli/lnk-socket-activation"
+
