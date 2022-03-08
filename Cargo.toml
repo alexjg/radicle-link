@@ -16,6 +16,7 @@ members = [
   "link-git",
   "link-identities",
   "link-replication",
+  "link-sock-activation",
   "link-tracking",
   "macros",
   "node-lib",
