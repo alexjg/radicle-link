@@ -28,4 +28,4 @@ use_field_init_shorthand = false
 
 force_explicit_abi = true
 
-ignore = ["link-canonical/src/formatter.rs", "link-canonical/src/json/parser/string.rs"]
+ignore = ["link-canonical/src/formatter.rs", "link-canonical/src/json/parser/string.rs", "link-sock-activation/src/listen_fds.rs"]
