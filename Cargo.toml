@@ -22,6 +22,7 @@ members = [
   "cli/lnk-exe",
   "cli/lnk-identities",
   "cli/lnk-profile",
+  "cli/lnk-sock-activation",
   "std-ext",
   "test",
 ]
