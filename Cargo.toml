@@ -6,6 +6,7 @@ members = [
   "git-ext",
   "git-helpers",
   "git-ref-format",
+  "git-server",
   "git-trailers",
   "librad",
   "link-async",
