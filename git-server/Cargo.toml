@@ -1,0 +1,62 @@
+[package]
+name = "git-server"
+version = "0.1.0"
+edition = "2021"
+authors = ["Alex Good <alex@memoryandthought.me>"]
+license = "GPL-3.0-or-later"
+
+[lib]
+
+[dependencies]
+async-trait = "0.1"
+thiserror = "1.0"
+futures = "0.3"
+clap = "2.33"
+globset = "0.4"
+rand = "0.8.5"
+tracing = "0.1"
+regex = "1.5.4"
+multibase = "0.9"
+multihash = "0.11"
+xdg = "2.4.1"
+lazy_static = "1.4.0"
+nix = "0.23"
+
+[dependencies.git2]
+version = ">= 0.13.23"
+default-features = false
+features = ["vendored-libgit2"]
+
+[dependencies.librad]
+path = "../librad"
+
+[dependencies.link-async]
+path = "../link-async"
+
+[dependencies.linkd-lib]
+path = "../cli/linkd-lib"
+
+[dependencies.lnk-clib]
+path    = "../cli/lnk-clib"
+
+[dependencies.radicle-git-ext]
+path = "../git-ext"
+
+[dependencies.structopt]
+version = "0.3"
+default-features = false
+
+[dependencies.tokio]
+version = "1.10"
+default-features = false
+features = [ "fs", "io-std", "macros", "process", "rt-multi-thread", "signal" ]
+
+[dependencies.lnk-thrussh]
+version = "0.33.5"
+
+[dependencies.lnk-thrussh-keys]
+version = "0.21.0"
+
+[dependencies.tracing-subscriber]
+version = "0.3.0"
+features = ["std", "env-filter", "fmt", "json"]
