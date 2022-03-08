@@ -1,0 +1,12 @@
+[package]
+name = "link-sock-activation"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+
+[dependencies]
+thiserror = "1.0"
+nix = "0.23"
+tracing = { version = "0.1", default-features = false, features = [ "attributes", "std" ] }
+itertools = "0.10.0"
