@@ -102,6 +102,9 @@ path = "../link-replication"
 [dependencies.link-tracking]
 path = "../link-tracking"
 
+[dependencies.link-sock-activation]
+path = "../link-sock-activation"
+
 [dependencies.node-lib]
 path = "../node-lib"
 
