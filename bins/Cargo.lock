@@ -2079,6 +2079,7 @@ dependencies = [
  "librad",
  "link-async",
  "lnk-clib",
+ "lnk-socket-activation",
  "lnk-thrussh-agent",
  "log",
  "minicbor",
@@ -2197,6 +2198,16 @@ dependencies = [
  "clap",
  "lnk-exe",
  "lnk-profile",
+]
+
+[[package]]
+name = "lnk-socket-activation"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.10.3",
+ "nix",
+ "thiserror",
+ "tracing",
 ]
 
 [[package]]
