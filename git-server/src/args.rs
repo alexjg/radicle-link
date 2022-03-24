@@ -20,21 +20,25 @@ pub struct Args {
     pub announce_on_push: bool,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Signer(#[from] lnk_clib::keys::ssh::Error),
+    #[error(transparent)]
+    Profile(#[from] librad::profile::Error),
+}
+
 impl Args {
     pub async fn into_config(
         self,
         spawner: Arc<link_async::Spawner>,
-    ) -> Result<super::config::Config<BoxedSigner>, String> {
+    ) -> Result<super::config::Config<BoxedSigner>, Error> {
         let home = LnkHome::Root(self.lnk_home);
-        let profile = Profile::from_home(&home, None)
-            .map_err(|e| format!("unable to load profile: {}", e))?;
+        let profile = Profile::from_home(&home, None)?;
         let signer = spawner
             .blocking({
                 let profile = profile.clone();
-                move || {
-                    lnk_clib::keys::ssh::signer(&profile, lnk_clib::keys::ssh::SshAuthSock::Env)
-                        .map_err(|e| format!("unable to load ssh signing key: {}", e))
-                }
+                move || lnk_clib::keys::ssh::signer(&profile, lnk_clib::keys::ssh::SshAuthSock::Env)
             })
             .await?;
         Ok(super::config::Config {
