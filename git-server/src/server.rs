@@ -415,3 +415,4 @@ fn nix_signal(sig: &thrussh::Sig) -> Option<nix::sys::signal::Signal> {
         Sig::Custom(_) => None,
     }
 }
+

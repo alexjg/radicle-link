@@ -1,10 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
+use clap::Parser;
 use futures::{FutureExt, StreamExt};
 use librad::PeerId;
 use lnk_thrussh as thrussh;
 use lnk_thrussh_keys as thrussh_keys;
-use structopt::StructOpt;
 use tokio::net::TcpListener;
 use tracing::instrument;
 
@@ -35,7 +35,7 @@ pub enum RunError {
 
 pub async fn main() {
     tracing_subscriber::fmt::init();
-    let args = args::Args::from_args();
+    let args = args::Args::parse();
     let spawner = Arc::new(link_async::Spawner::from_current().unwrap());
     let config = match args.into_config(spawner.clone()).await {
         Ok(c) => c,

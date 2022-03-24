@@ -1,21 +1,22 @@
 use std::{net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
+use clap::Parser;
+
 use librad::{
     crypto::BoxedSigner,
     profile::{LnkHome, Profile},
 };
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 pub struct Args {
     pub lnk_home: PathBuf,
-    #[structopt(short)]
+    #[clap(short)]
     pub addr: Option<SocketAddr>,
-    #[structopt(long)]
+    #[clap(long)]
     pub linger_timeout: Option<LingerTimeout>,
-    #[structopt(long)]
+    #[clap(long)]
     pub linkd_rpc_socket: Option<PathBuf>,
-    #[structopt(long)]
+    #[clap(long)]
     pub announce_on_push: bool,
 }
 
