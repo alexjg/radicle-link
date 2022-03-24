@@ -5,7 +5,7 @@
 
 use link_crypto_test::gen::gen_peer_id;
 use link_identities_test::gen::urn::{gen_oid, gen_urn};
-use node_lib::{api::messages, Seed};
+use linkd_lib::{api::messages, Seed};
 use proptest::prelude::*;
 
 pub fn user_agent() -> impl Strategy<Value = messages::UserAgent> {
