@@ -41,7 +41,7 @@ version = "0.1.0"
 path = "../../link-async"
 
 [dependencies.lnk-socket-activation]
-path = "..//lnk-socket-activation"
+path = "../lnk-socket-activation"
 
 [dependencies.minicbor]
 version = "0.13"
