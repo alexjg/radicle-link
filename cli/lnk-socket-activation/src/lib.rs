@@ -11,6 +11,11 @@ mod unix;
 #[cfg(all(unix, not(target_os = "macos")))]
 pub use unix::{env_sockets, Error};
 
+#[cfg(target_os = "macos")]
+mod osx;
+#[cfg(target_os = "macos")]
+pub use osx::{env_sockets, Error};
+
 use std::{net::TcpListener, os::unix::net::UnixListener};
 
 /// The type of a socket found in the socket activated environment variables
@@ -19,9 +24,4 @@ pub enum Socket {
     Unix(UnixListener),
     /// A TCP socket
     Tcp(TcpListener),
-}
-
-#[cfg(target_os = "macos")]
-pub fn env_sockets() -> Result<Option<HashMap<String, UnixListener>>, Error> {
-    todo!()
 }
