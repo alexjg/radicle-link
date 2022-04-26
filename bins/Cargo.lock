@@ -2232,6 +2232,7 @@ name = "lnk-clib"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "futures",
  "futures-lite",
  "itertools 0.10.3",
  "librad",
