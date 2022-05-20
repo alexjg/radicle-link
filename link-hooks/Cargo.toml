@@ -1,0 +1,19 @@
+[package]
+name = "link-hooks"
+version = "0.1.0"
+authors = ["Fintan Halpenny <fintan.halpenny@gmail.com>"]
+edition = "2021"
+license = "GPL-3.0-or-later"
+
+[lib]
+doctest = false
+test = false
+
+[dependencies]
+multihash = "0.11"
+
+[dependencies.link-crypto]
+path = "../link-crypto"
+
+[dependencies.link-identities]
+path = "../link-identities"
