@@ -39,16 +39,17 @@ impl Paths {
         let config_dir = proj.config_dir().join(profile_id);
         let data_dir = proj.data_dir().join(profile_id);
         let cache_dir = proj.cache_dir().join(profile_id);
-        let hooks_dir = proj.cache_dir().join(profile_id);
+        let git_dir = data_dir.join("git");
+        let hooks_dir = git_dir.join("hooks");
 
         Self {
             keys_dir: config_dir.join("keys"),
-            git_dir: data_dir.join("git"),
+            git_dir,
             git_includes_dir: config_dir.join("git-includes"),
             cob_cache_dir: cache_dir.join("cob-cache"),
             socket_dir: socket_dir()?,
             seeds_file: config_dir.join("seeds"),
-            hooks_dir: hooks_dir.join("hooks"),
+            hooks_dir,
         }
         .init()
     }
@@ -56,14 +57,17 @@ impl Paths {
     /// All paths are contained in the given directory.
     pub fn from_root(root: impl AsRef<Path>) -> Result<Self, io::Error> {
         let root = root.as_ref();
+        let git_dir = root.join("git");
+        let hooks_dir = git_dir.join("hooks");
+
         Self {
             keys_dir: root.join("keys"),
-            git_dir: root.join("git"),
+            git_dir,
             git_includes_dir: root.join("git-includes"),
             cob_cache_dir: root.join("cob-cache"),
             socket_dir: socket_dir()?,
             seeds_file: root.join("seeds"),
-            hooks_dir: root.join("hooks"),
+            hooks_dir,
         }
         .init()
     }
