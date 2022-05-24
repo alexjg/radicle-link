@@ -46,5 +46,4 @@ pub trait Hook {
 }
 
 // TODO(finto): Hook execution with arguments - end of process 0x04
-// TODO(finto): Test the roundtrip of Data and Track
 // TODO(finto): Test the API surface of Data and Track

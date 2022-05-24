@@ -21,12 +21,12 @@ impl<R> Track<R>
 where
     R: IsZero + PartialEq,
 {
-    pub fn is_deleted(&self) -> bool {
-        self.new.is_zero() && !self.old.is_zero()
-    }
-
     pub fn is_created(&self) -> bool {
         !self.new.is_zero() && self.old.is_zero()
+    }
+
+    pub fn is_deleted(&self) -> bool {
+        self.new.is_zero() && !self.old.is_zero()
     }
 
     pub fn is_changed(&self) -> bool {
