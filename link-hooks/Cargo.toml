@@ -37,4 +37,4 @@ path = "../link-identities"
 
 [dependencies.tokio]
 version = "1.18"
-features = ["io-util", "process"]
+features = ["io-util", "process", "sync"]

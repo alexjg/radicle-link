@@ -4,9 +4,13 @@
 #[macro_use]
 extern crate async_trait;
 
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
-use futures::{Stream, StreamExt as _};
+use ::tokio::sync::mpsc;
+use futures::{stream::FuturesUnordered, FutureExt, StreamExt as _};
+use multihash::Multihash;
+
+use link_identities::urn::{HasProtocol, Urn};
 
 pub mod data;
 pub use data::Data;
@@ -77,14 +81,37 @@ pub trait Handle: Sized {
 // TODO(finto): handle and write would probably need to be async to allow for
 // interleaving.
 
+pub enum Notification<R> {
+    Track(Track<R>),
+    Data(Data<R>),
+}
+
 pub struct Hook<P: Handle> {
     path: PathBuf,
     child: P,
 }
 
-impl<P: Handle> Hook<P> {
+impl<P: Handle + Send + Sync + 'static> Hook<P> {
     pub fn new(path: PathBuf, child: P) -> Self {
         Self { path, child }
+    }
+
+    pub fn start<'a, D>(mut self) -> (mpsc::Sender<D>, futures::future::BoxFuture<'a, PathBuf>)
+    where
+        D: Display + Send + Sync + 'static,
+    {
+        // TODO: figure out why this is 10
+        let (sx, mut rx) = mpsc::channel::<D>(10);
+        let routine = async move {
+            while let Some(msg) = rx.recv().await {
+                if let Err(err) = self.write(msg.display().as_bytes()).await {
+                    tracing::warn!(path = %self.path.display(), err = %err, "failed to write to hook");
+                    return self.path;
+                }
+            }
+            self.path
+        }.boxed();
+        (sx, routine)
     }
 }
 
@@ -145,23 +172,96 @@ pub mod tokio {
     }
 }
 
-pub async fn notify<P, N, S>(mut hooks: Vec<Hook<P>>, mut data: S)
+struct Hooks<P: Handle, R> {
+    rx: ::tokio::sync::mpsc::Receiver<Notification<R>>,
+    data_hooks: Vec<Hook<P>>,
+    track_hooks: Vec<Hook<P>>,
+}
+
+impl<P: Handle + Send + Sync + 'static, R> Hooks<P, R>
 where
-    P: Handle + Send + Sync + 'static,
-    S: Stream<Item = N> + Unpin,
-    N: Display,
+    R: Clone + HasProtocol + std::fmt::Display + Send + Sync + 'static,
+    for<'a> &'a R: Into<Multihash>,
 {
-    while let Some(d) = data.next().await {
-        for hook in hooks.iter_mut() {
-            if let Err(err) = hook.write(d.display().as_bytes()).await {
-                tracing::warn!(path = %hook.path.display(), err = %err, "failed to write to hook");
+    async fn run(mut self, stop: ::tokio::sync::oneshot::Receiver<()>) {
+        let mut routines = FuturesUnordered::new();
+        let mut data_senders: HashMap<PathBuf, mpsc::Sender<Data<R>>> = HashMap::new();
+        let mut track_senders: HashMap<PathBuf, mpsc::Sender<Track<R>>> = HashMap::new();
+
+        for hook in self.data_hooks {
+            let path = hook.path.clone();
+            let (sender, routine) = hook.start();
+            data_senders.insert(path, sender);
+            routines.push(routine);
+        }
+        for hook in self.track_hooks {
+            let path = hook.path.clone();
+            let (sender, routine) = hook.start();
+            track_senders.insert(path, sender);
+            routines.push(routine);
+        }
+        loop {
+            futures::select! {
+                failed_hook_path = routines.next().fuse() => {
+                    if let Some(failed_hook_path) = failed_hook_path {
+                        data_senders.remove(&failed_hook_path);
+                        track_senders.remove(&failed_hook_path);
+                    } else {
+                        tracing::error!("all hook routines have stopped");
+                        break;
+                    }
+                }
+                n = self.rx.recv().fuse() => {
+                    match n {
+                        Some(Notification::Data(d)) => for (path, sender) in &data_senders {
+                            if let Err(_) = sender.try_send(d.clone()) {
+                                tracing::warn!(hook=%path.display(), "dropping data message for hook which is running too slowly");
+                            }
+                        },
+                        Some(Notification::Track(t)) => for (path, sender) in &track_senders {
+                            if let Err(_) = sender.try_send(t.clone()) {
+                                tracing::warn!(hook=%path.display(), "dropping track message for hook which is running too slowly");
+                            }
+                        },
+                        None => break,
+                    }
+                },
+                _ = stop => {
+                    tracing::info!("hook routines shutting down");
+                    break;
+                }
             }
         }
+
+        // Send EOTs to all senders
+
+        // wait for subprocesses to finish with timeout
+
+        // Kill any remaining
+        //
+        // Go home
     }
 
-    for hook in hooks.iter_mut() {
-        if let Err(err) = hook.write(&[EOT]).await {
-            tracing::warn!(path = %hook.path.display(), err = %err, "failed to write EOT to hook");
-        }
-    }
+    //async fn dispatch(&mut self, data: Notification<R>) {
+    //}
 }
+
+//pub async fn notify<P, R, S>(mut hooks: Hooks<P, R>, mut data: S)
+//where
+//P: Handle + Send + Sync + 'static,
+//S: Stream<Item = Notification<R>> + Unpin,
+//{
+//while let Some(d) = data.next().await {
+//for hook in hooks.iter_mut() {
+//if let Err(err) = hook.write(d.display().as_bytes()).await {
+//tracing::warn!(path = %hook.path.display(), err = %err, "failed to write to hook");
+//}
+//}
+//}
+
+//for hook in hooks.iter_mut() {
+//if let Err(err) = hook.write(&[EOT]).await {
+//tracing::warn!(path = %hook.path.display(), err = %err, "failed to write EOT to hook");
+//}
+//}
+//}
