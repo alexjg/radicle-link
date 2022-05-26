@@ -7,7 +7,7 @@ use link_crypto::PeerId;
 use link_identities::urn::{HasProtocol, Urn};
 use multihash::Multihash;
 
-use super::IsZero;
+use super::{sealed, Display, IsZero};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Track<R> {
@@ -31,6 +31,7 @@ where
 
     pub fn is_changed(&self) -> bool {
         self.new != self.old
+        // TODO
     }
 }
 
@@ -48,6 +49,17 @@ where
         }?;
 
         write!(f, "{} {}\n", self.old, self.new)
+    }
+}
+
+impl<R> sealed::Sealed for Track<R> {}
+impl<R> Display for Track<R>
+where
+    R: HasProtocol + fmt::Display,
+    for<'a> &'a R: Into<Multihash>,
+{
+    fn display(&self) -> String {
+        self.to_string()
     }
 }
 

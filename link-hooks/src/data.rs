@@ -6,7 +6,7 @@ use std::{fmt, str::FromStr};
 use link_identities::urn::{HasProtocol, Urn};
 use multihash::Multihash;
 
-use super::IsZero;
+use super::{sealed, Display, IsZero};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Data<R> {
@@ -28,6 +28,7 @@ where
     }
 
     pub fn is_changed(&self) -> bool {
+        // TODO(finto): do we need to check zero
         self.new != self.old
     }
 }
@@ -41,6 +42,17 @@ where
         write!(f, "{} ", self.urn)?;
 
         write!(f, "{} {}\n", self.old, self.new)
+    }
+}
+
+impl<R> sealed::Sealed for Data<R> {}
+impl<R> Display for Data<R>
+where
+    R: HasProtocol + fmt::Display,
+    for<'a> &'a R: Into<Multihash>,
+{
+    fn display(&self) -> String {
+        self.to_string()
     }
 }
 
