@@ -15,6 +15,7 @@ use thiserror::Error;
 pub mod cli;
 
 pub mod any;
+pub mod identity_dir;
 pub mod local;
 pub mod person;
 pub mod project;
