@@ -40,5 +40,8 @@ path = "../../link-async"
 [dependencies.lnk-clib]
 path = "../../cli/lnk-clib"
 
+[dependencies.radicle-git-ext]
+path = "../../git-ext"
+
 [dependencies.test-helpers]
 path = "../test-helpers"
