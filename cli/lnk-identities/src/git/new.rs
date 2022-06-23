@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use librad::{
     canonical::Cstring,
-    git::local::{transport::CanOpenStorage, url::LocalUrl},
+    git::{local::transport::CanOpenStorage, rad_url::RadRemoteUrl},
     git_ext::OneLevel,
     identities::payload,
 };
@@ -75,7 +75,7 @@ impl<P> New<Invalid, P> {
 }
 
 impl New<Valid, payload::ProjectPayload> {
-    pub fn init<F>(self, url: LocalUrl, open_storage: F) -> Result<git2::Repository, Error>
+    pub fn init<F>(self, url: RadRemoteUrl, open_storage: F) -> Result<git2::Repository, Error>
     where
         F: CanOpenStorage + Clone + 'static,
     {
@@ -92,7 +92,7 @@ impl New<Valid, payload::ProjectPayload> {
 }
 
 impl New<Valid, payload::PersonPayload> {
-    pub fn init<F>(self, url: LocalUrl, open_storage: F) -> Result<git2::Repository, Error>
+    pub fn init<F>(self, url: RadRemoteUrl, open_storage: F) -> Result<git2::Repository, Error>
     where
         F: CanOpenStorage + Clone + 'static,
     {
@@ -106,7 +106,7 @@ fn init<F>(
     path: PathBuf,
     default: OneLevel,
     description: &Option<Cstring>,
-    url: LocalUrl,
+    url: RadRemoteUrl,
     open_storage: F,
 ) -> Result<git2::Repository, Error>
 where

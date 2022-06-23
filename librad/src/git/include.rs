@@ -14,8 +14,9 @@ use git_ext as ext;
 use tempfile::NamedTempFile;
 
 use super::{
-    local::url::LocalUrl,
+    rad_url::RadRemoteUrl,
     types::{Flat, Force, GenericRef, Reference, Refspec, Remote},
+    Urn,
 };
 use crate::PeerId;
 
@@ -59,7 +60,7 @@ pub enum Error {
 /// ```
 pub struct Include<Path> {
     /// The list of remotes that will be generated for this include file.
-    remotes: Vec<Remote<LocalUrl>>,
+    remotes: Vec<Remote<RadRemoteUrl>>,
     /// The directory path where the include file will be stored.
     pub path: Path,
     /// The namespace and `PeerId` this include file is interested in. In other
@@ -68,20 +69,20 @@ pub struct Include<Path> {
     ///
     /// Note that the final file name will be named after
     /// the namespace.
-    pub local_url: LocalUrl,
+    pub namespace: Urn,
 }
 
 impl<Path> Include<Path> {
     /// Create a new `Include` with an empty set of remotes.
-    pub fn new(path: Path, local_url: LocalUrl) -> Self {
+    pub fn new(path: Path, namespace: Urn) -> Self {
         Include {
             remotes: vec![],
             path,
-            local_url,
+            namespace,
         }
     }
 
-    pub fn add_remote(&mut self, url: LocalUrl, peer: PeerId, handle: impl Into<ext::RefLike>) {
+    pub fn add_remote(&mut self, url: RadRemoteUrl, peer: PeerId, handle: impl Into<ext::RefLike>) {
         let remote = Self::build_remote(url, peer, handle);
         self.remotes.push(remote);
     }
@@ -135,7 +136,7 @@ impl<Path> Include<Path> {
         self.path
             .as_ref()
             .to_path_buf()
-            .join(self.local_url.urn.encode_id())
+            .join(self.namespace.encode_id())
             .with_extension("inc")
     }
 
@@ -145,7 +146,7 @@ impl<Path> Include<Path> {
     /// The tracked personal identities are expected to be retrieved by talking
     /// to the [`crate::git::storage::Storage`].
     #[tracing::instrument(level = "debug", skip(tracked))]
-    pub fn from_tracked_persons<R, I>(path: Path, local_url: LocalUrl, tracked: I) -> Self
+    pub fn from_tracked_persons<R, I>(path: Path, urn: Urn, tracked: I) -> Self
     where
         Path: Debug,
         R: Into<ext::RefLike>,
@@ -153,22 +154,24 @@ impl<Path> Include<Path> {
     {
         let remotes = tracked
             .into_iter()
-            .map(|(handle, peer)| Self::build_remote(local_url.clone(), peer, handle.into()))
+            .map(|(handle, peer)| {
+                Self::build_remote(RadRemoteUrl::from(urn.clone()), peer, handle.into())
+            })
             .collect();
         tracing::trace!("computed remotes: {:?}", remotes);
 
         Self {
             remotes,
             path,
-            local_url,
+            namespace: urn,
         }
     }
 
     fn build_remote(
-        url: LocalUrl,
+        url: RadRemoteUrl,
         peer: PeerId,
         handle: impl Into<ext::RefLike>,
-    ) -> Remote<LocalUrl> {
+    ) -> Remote<RadRemoteUrl> {
         let handle = handle.into();
         let name = ext::RefLike::try_from(format!("{}@{}", handle, peer))
             .expect("handle and peer are reflike");

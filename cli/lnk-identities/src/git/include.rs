@@ -9,7 +9,6 @@ use librad::{
     git::{
         identities,
         include::{self, Include},
-        local::url::LocalUrl,
         storage::ReadOnly,
     },
     git_ext,
@@ -46,11 +45,10 @@ where
     I: HasUrn,
 {
     let urn = identity.urn();
-    let url = LocalUrl::from(urn.clone());
     let tracked = identities::relations::tracked(storage, &urn)?;
     let include = Include::from_tracked_persons(
         paths.git_includes_dir().to_path_buf(),
-        url,
+        urn,
         tracked
             .into_iter()
             .filter_map(|peer| {

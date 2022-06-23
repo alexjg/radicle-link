@@ -15,30 +15,20 @@ use thiserror::Error;
 
 use super::Urn;
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct LocalTransportUrl {
-    pub urn: Urn,
-    pub(super) active_index: Option<usize>,
-}
+pub const URL_SCHEME: &str = "rad";
 
-impl From<Urn> for LocalTransportUrl {
+#[derive(Clone, Debug, PartialEq)]
+pub struct RadRemoteUrl(Urn);
+
+impl From<Urn> for RadRemoteUrl {
     fn from(urn: Urn) -> Self {
-        Self {
-            urn,
-            active_index: None,
-        }
+        Self(urn)
     }
 }
 
-impl Display for LocalTransportUrl {
+impl Display for RadRemoteUrl {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}://{}.git", super::URL_SCHEME, self.urn.encode_id(),)?;
-
-        if let Some(idx) = self.active_index {
-            write!(f, "#{}", idx)?;
-        }
-
-        Ok(())
+        write!(f, "{}://{}.git", URL_SCHEME, self.0.encode_id(),)
     }
 }
 
@@ -54,9 +44,6 @@ pub enum ParseError {
     #[error("malformed URL")]
     Url(#[from] url::ParseError),
 
-    #[error("active index is not a number")]
-    Idx(#[from] std::num::ParseIntError),
-
     #[error(transparent)]
     Oid(#[from] ext::oid::FromMultihashError),
 
@@ -70,12 +57,12 @@ pub enum ParseError {
     Peer(#[from] crypto::peer::conversion::Error),
 }
 
-impl FromStr for LocalTransportUrl {
+impl FromStr for RadRemoteUrl {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let url = url::Url::parse(s)?;
-        if url.scheme() != super::URL_SCHEME {
+        if url.scheme() != URL_SCHEME {
             return Err(Self::Err::InvalidScheme(url.scheme().to_owned()));
         }
         if url.cannot_be_a_base() {
@@ -91,21 +78,12 @@ impl FromStr for LocalTransportUrl {
         let oid = ext::Oid::try_from(mhash)?;
         let urn = Urn::new(oid);
 
-        let active_index = url.fragment().map(|s| s.parse()).transpose()?;
-
-        Ok(Self { urn, active_index })
+        Ok(Self(urn))
     }
 }
 
-impl From<LocalTransportUrl> for Urn {
-    fn from(url: LocalTransportUrl) -> Self {
-        url.urn
-    }
-}
-
-impl From<super::super::rad_url::RadRemoteUrl> for LocalTransportUrl {
-    fn from(r: super::super::rad_url::RadRemoteUrl) -> Self {
-        let urn: Urn = r.into();
-        Self::from(urn)
+impl From<RadRemoteUrl> for Urn {
+    fn from(url: RadRemoteUrl) -> Self {
+        url.0
     }
 }

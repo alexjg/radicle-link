@@ -10,13 +10,13 @@ use std::{
     process::{Command, Stdio},
 };
 
-use librad::{crypto::keystore::pinentry::SecUtf8, git::local::url::LocalUrl};
+use librad::{crypto::keystore::pinentry::SecUtf8, git::rad_url::RadRemoteUrl};
 
 pub type Passphrase = SecUtf8;
 
 pub trait Credential {
-    fn get(&self, url: &LocalUrl) -> io::Result<Passphrase>;
-    fn put(&mut self, url: &LocalUrl, passphrase: Passphrase) -> io::Result<()>;
+    fn get(&self, url: &RadRemoteUrl) -> io::Result<Passphrase>;
+    fn put(&mut self, url: &RadRemoteUrl, passphrase: Passphrase) -> io::Result<()>;
 }
 
 pub struct Git {
@@ -30,7 +30,7 @@ impl Git {
         }
     }
 
-    pub fn get(&self, url: &LocalUrl) -> io::Result<Passphrase> {
+    pub fn get(&self, url: &RadRemoteUrl) -> io::Result<Passphrase> {
         let mut child = Command::new("git")
             .env("GIT_DIR", &self.git_dir)
             .envs(env::vars().filter(|(key, _)| key.starts_with("GIT_TRACE")))
@@ -56,7 +56,7 @@ impl Git {
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "couldn't obtain passphrase"))
     }
 
-    pub fn put(&mut self, url: &LocalUrl, passphrase: Passphrase) -> io::Result<()> {
+    pub fn put(&mut self, url: &RadRemoteUrl, passphrase: Passphrase) -> io::Result<()> {
         let mut child = Command::new("git")
             .env("GIT_DIR", &self.git_dir)
             .envs(env::vars().filter(|(key, _)| key.starts_with("GIT_TRACE")))
@@ -82,11 +82,11 @@ impl Git {
 }
 
 impl Credential for Git {
-    fn get(&self, url: &LocalUrl) -> io::Result<Passphrase> {
+    fn get(&self, url: &RadRemoteUrl) -> io::Result<Passphrase> {
         self.get(url)
     }
 
-    fn put(&mut self, url: &LocalUrl, passphrase: Passphrase) -> io::Result<()> {
+    fn put(&mut self, url: &RadRemoteUrl, passphrase: Passphrase) -> io::Result<()> {
         self.put(url, passphrase)
     }
 }

@@ -6,6 +6,6 @@
 pub mod transport;
 pub mod url;
 
-pub const URL_SCHEME: &str = "rad";
+pub const URL_SCHEME: &str = "rad-internal";
 
 use super::Urn;

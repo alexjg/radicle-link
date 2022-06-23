@@ -7,7 +7,7 @@ use std::{convert::TryFrom, io};
 
 use librad::{
     git::{
-        local::url::LocalUrl,
+        rad_url::RadRemoteUrl,
         types::{remote::Remote, AsNamespace, Force, Namespace, Reference, Refspec},
         Urn,
     },
@@ -47,12 +47,12 @@ fn can_create_remote() {
         };
 
         {
-            let url = LocalUrl::from(URN.clone());
+            let url = RadRemoteUrl::from(URN.clone());
             let mut remote = Remote::rad_remote(url, fetch).with_pushspecs(Some(push));
             remote.save(&repo).expect("failed to persist the remote");
         }
 
-        let remote = Remote::<LocalUrl>::find(&repo, reflike!("rad"))
+        let remote = Remote::<RadRemoteUrl>::find(&repo, reflike!("rad"))
             .unwrap()
             .expect("should exist");
 
@@ -87,7 +87,7 @@ fn can_create_remote() {
 
 #[test]
 fn check_remote_fetch_spec() -> Result<(), git2::Error> {
-    let url = LocalUrl::from(URN.clone());
+    let url = RadRemoteUrl::from(URN.clone());
     let name = ext::RefLike::try_from(format!("lyla@{}", *PEER_ID)).unwrap();
 
     let heads = Reference::heads(None, *PEER_ID);

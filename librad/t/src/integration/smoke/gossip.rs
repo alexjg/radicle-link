@@ -14,7 +14,7 @@ use git_ref_format::{lit, name, Qualified};
 use it_helpers::{fixed::TestProject, git::create_commit, testnet};
 use librad::{
     git::{
-        local::url::LocalUrl,
+        rad_url::RadRemoteUrl,
         storage::ReadOnlyStorage as _,
         types::{remote, Fetchspec, Force, Reference, Remote},
         Urn,
@@ -77,7 +77,7 @@ fn fetches_on_gossip_notify() {
             let peer1 = (*peer1).clone();
             move || {
                 let repo = git2::Repository::init(&project_repo_path).unwrap();
-                let url = LocalUrl::from(project_urn);
+                let url = RadRemoteUrl::from(project_urn);
 
                 let mut remote = Remote::rad_remote::<_, Fetchspec>(url, None);
 

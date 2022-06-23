@@ -10,10 +10,8 @@ use nonempty::NonEmpty;
 use librad::{
     canonical::Cstring,
     git::{
-        local::{
-            transport::{self, CanOpenStorage},
-            url::LocalUrl,
-        },
+        local::transport::{self, CanOpenStorage},
+        rad_url::RadRemoteUrl,
         types::{
             remote::{LocalFetchspec, LocalPushspec, Remote},
             Fetchspec,
@@ -56,9 +54,9 @@ pub enum Error {
 pub fn setup_remote<F>(
     repo: &git2::Repository,
     open_storage: F,
-    url: LocalUrl,
+    url: RadRemoteUrl,
     default_branch: &OneLevel,
-) -> Result<Remote<LocalUrl>, Error>
+) -> Result<Remote<RadRemoteUrl>, Error>
 where
     F: CanOpenStorage + Clone + 'static,
 {
@@ -187,8 +185,8 @@ pub fn set_upstream<Url>(
 pub fn clone<F>(
     path: &Path,
     storage: F,
-    mut remote: Remote<LocalUrl>,
-) -> Result<(git2::Repository, Remote<LocalUrl>), Error>
+    mut remote: Remote<RadRemoteUrl>,
+) -> Result<(git2::Repository, Remote<RadRemoteUrl>), Error>
 where
     F: CanOpenStorage + 'static,
 {
@@ -221,7 +219,7 @@ pub mod validation {
 
     use librad::{
         git::{
-            local::url::LocalUrl,
+            rad_url::RadRemoteUrl,
             types::remote::{self, Remote},
         },
         git_ext::{self, OneLevel},
@@ -238,7 +236,10 @@ pub mod validation {
         },
 
         #[error("a `rad` remote exists with the URL `{found}`, the expected URL for this project is `{expected}`. If you want to continue with creating this project you will need to remove the existing `rad` remote entry.")]
-        UrlMismatch { expected: LocalUrl, found: LocalUrl },
+        UrlMismatch {
+            expected: RadRemoteUrl,
+            found: RadRemoteUrl,
+        },
 
         #[error(transparent)]
         Remote(#[from] remote::FindError),
@@ -262,9 +263,9 @@ pub mod validation {
 
     pub fn remote(
         repo: &git2::Repository,
-        url: &LocalUrl,
-    ) -> Result<Option<Remote<LocalUrl>>, Error> {
-        match Remote::<LocalUrl>::find(repo, reflike!("rad")) {
+        url: &RadRemoteUrl,
+    ) -> Result<Option<Remote<RadRemoteUrl>>, Error> {
+        match Remote::<RadRemoteUrl>::find(repo, reflike!("rad")) {
             Err(err) => Err(Error::Remote(err)),
             Ok(Some(remote)) if remote.url != *url => Err(Error::UrlMismatch {
                 expected: url.clone(),

@@ -21,12 +21,16 @@ use git_ext::{into_git_err, RECEIVE_PACK_HEADER, UPLOAD_PACK_HEADER};
 use rustc_hash::FxHashMap;
 use thiserror::Error;
 
-use super::{super::url::LocalUrl, CanOpenStorage};
+use super::{super::url::LocalTransportUrl, CanOpenStorage};
 
-pub(super) fn with<F, G, A>(open_storage: F, url: LocalUrl, g: G) -> Result<A, super::Error>
+pub(super) fn with<F, G, A>(
+    open_storage: F,
+    url: LocalTransportUrl,
+    g: G,
+) -> Result<A, super::Error>
 where
     F: CanOpenStorage + 'static,
-    G: FnOnce(LocalUrl) -> A,
+    G: FnOnce(LocalTransportUrl) -> A,
 {
     let (tx, rx) = mpsc::channel();
     let act = Active {
@@ -35,7 +39,7 @@ where
     };
     let fct = Factory::new();
     let idx = fct.add(act);
-    let url = LocalUrl {
+    let url = LocalTransportUrl {
         active_index: Some(idx),
         ..url
     };
@@ -148,7 +152,7 @@ impl git2::transport::SmartSubtransport for Factory {
         url: &str,
         service: git2::transport::Service,
     ) -> Result<Box<dyn git2::transport::SmartSubtransportStream>, git2::Error> {
-        let url = url.parse::<LocalUrl>().map_err(|e| {
+        let url = url.parse::<LocalTransportUrl>().map_err(|e| {
             git2::Error::new(
                 git2::ErrorCode::Invalid,
                 git2::ErrorClass::Invalid,

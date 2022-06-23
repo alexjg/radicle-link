@@ -3,11 +3,11 @@
 // This file is part of radicle-link, distributed under the GPLv3 with Radicle
 // Linking Exception. For full terms see the included LICENSE file.
 
-use librad::git::{local::url::LocalUrl, Urn};
+use librad::git::{local::url::LocalTransportUrl, Urn};
 use test_helpers::roundtrip;
 
 #[test]
 fn trip() {
-    let url = LocalUrl::from(Urn::new(git2::Oid::zero().into()));
+    let url = LocalTransportUrl::from(Urn::new(git2::Oid::zero().into()));
     roundtrip::str(url)
 }

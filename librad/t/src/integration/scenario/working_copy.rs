@@ -14,7 +14,7 @@ use librad::{
     git::{
         identities::{self, Person, Project},
         include,
-        local::url::LocalUrl,
+        rad_url::RadRemoteUrl,
         tracking,
         types::{
             remote::{LocalFetchspec, LocalPushspec},
@@ -145,7 +145,7 @@ where
     G: RequestPullGuard,
 {
     let repo = git2::Repository::init(repo_path)?;
-    let url = LocalUrl::from(project.urn());
+    let url = RadRemoteUrl::from(project.urn());
 
     let fetchspec = Refspec {
         src: Reference::heads(Namespace::from(project.urn()), peer.peer_id()),
@@ -203,7 +203,7 @@ where
 
     let inc = include::Include::from_tracked_persons(
         inc_path,
-        LocalUrl::from(project.urn()),
+        project.urn(),
         tracked_persons.into_iter().map(|(person, peer_id)| {
             (
                 ext::RefLike::try_from(person.subject().name.as_str()).unwrap(),

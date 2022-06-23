@@ -12,7 +12,8 @@ use librad::{
     crypto::BoxedSigner,
     git::{
         identities::{self, local::LocalIdentity, project, relations, Project},
-        local::{transport, url::LocalUrl},
+        local::transport,
+        rad_url::RadRemoteUrl,
         storage::{ReadOnly, Storage},
         types::{Namespace, Reference},
         Urn,
@@ -125,7 +126,7 @@ where
     let delegations = resolve_indirect(storage, delegations)?;
 
     let urn = project::urn(storage, payload.clone(), delegations.clone())?;
-    let url = LocalUrl::from(urn);
+    let url = RadRemoteUrl::from(urn);
     let settings = transport::Settings {
         paths: paths.clone(),
         signer,

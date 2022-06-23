@@ -6,7 +6,7 @@
 use librad::{
     git::{
         include::{Error, Include},
-        local::url::LocalUrl,
+        rad_url::RadRemoteUrl,
         Urn,
     },
     git_ext as ext,
@@ -45,12 +45,13 @@ lazy_static! {
 #[test]
 fn can_create_and_update() -> Result<(), Error> {
     let tmp_dir = tempfile::tempdir()?;
-    let url = LocalUrl::from(Urn::new(git2::Oid::zero().into()));
+    let urn = Urn::new(git2::Oid::zero().into());
+    let url = RadRemoteUrl::from(urn.clone());
 
     // Start with an empty config to catch corner-cases where git2::Config does not
     // create a file yet.
     let config = {
-        let include = Include::new(tmp_dir.path().to_path_buf(), url.clone());
+        let include = Include::new(tmp_dir.path().to_path_buf(), urn.clone());
         let path = include.file_path();
         let config = git2::Config::open(&path)?;
         include.save()?;
@@ -60,7 +61,7 @@ fn can_create_and_update() -> Result<(), Error> {
 
     let remote_lyla = format!("{}@{}", *LYLA_HANDLE, *LYLA_PEER_ID);
     {
-        let mut include = Include::new(tmp_dir.path().to_path_buf(), url.clone());
+        let mut include = Include::new(tmp_dir.path().to_path_buf(), urn.clone());
         include.add_remote(url.clone(), *LYLA_PEER_ID, (*LYLA_HANDLE).clone());
         include.save()?;
     };
@@ -80,7 +81,7 @@ fn can_create_and_update() -> Result<(), Error> {
 
     let remote_rover = format!("{}@{}", *ROVER_HANDLE, *ROVER_PEER_ID);
     {
-        let mut include = Include::new(tmp_dir.path().to_path_buf(), url.clone());
+        let mut include = Include::new(tmp_dir.path().to_path_buf(), urn.clone());
         include.add_remote(url.clone(), *LYLA_PEER_ID, (*LYLA_HANDLE).clone());
         include.add_remote(url.clone(), *ROVER_PEER_ID, (*ROVER_HANDLE).clone());
         include.save()?;
@@ -116,7 +117,7 @@ fn can_create_and_update() -> Result<(), Error> {
     let remote_lingling = format!("{}@{}", *LINGLING_HANDLE, *LINGLING_PEER_ID);
 
     {
-        let mut include = Include::new(tmp_dir.path().to_path_buf(), url.clone());
+        let mut include = Include::new(tmp_dir.path().to_path_buf(), urn);
         include.add_remote(url, *LINGLING_PEER_ID, (*LINGLING_HANDLE).clone());
         include.save()?;
     };

@@ -14,7 +14,8 @@ use librad::{
     crypto::SecretKey,
     git::{
         identities::project::ProjectPayload,
-        local::{transport, url::LocalUrl},
+        local::transport,
+        rad_url::RadRemoteUrl,
         storage::Storage,
         types::remote::Remote,
         Urn,
@@ -81,7 +82,7 @@ fn validation_different_remote_exists() -> anyhow::Result<()> {
         )?;
 
         let urn = Urn::new(git2::Oid::zero().into());
-        let url = LocalUrl::from(urn);
+        let url = RadRemoteUrl::from(urn);
         let mut remote = Remote::new(url, reflike!("rad"));
         remote.save(&repo)?;
 
@@ -95,7 +96,7 @@ fn validation_different_remote_exists() -> anyhow::Result<()> {
         let storage = Storage::open(&*paths, signer.clone())?;
         let proj = TestProject::create(&storage)?;
         let urn = proj.project.urn();
-        let url = LocalUrl::from(urn);
+        let url = RadRemoteUrl::from(urn);
         let settings = transport::Settings {
             paths: paths.clone(),
             signer: signer.into(),
@@ -128,7 +129,7 @@ fn validation_remote_exists() -> anyhow::Result<()> {
         let validated = new.validate()?;
         let proj = TestProject::create(&storage)?;
         let urn = proj.project.urn();
-        let url = LocalUrl::from(urn);
+        let url = RadRemoteUrl::from(urn);
         let settings = transport::Settings {
             paths: paths.clone(),
             signer: signer.into(),
@@ -173,7 +174,7 @@ fn creation() -> anyhow::Result<()> {
         let storage = Storage::open(&*paths, signer.clone())?;
         let proj = TestProject::create(&storage)?;
         let urn = proj.project.urn();
-        let url = LocalUrl::from(urn);
+        let url = RadRemoteUrl::from(urn);
         let settings = transport::Settings {
             paths: paths.clone(),
             signer: signer.into(),
@@ -188,9 +189,13 @@ fn creation() -> anyhow::Result<()> {
 
 /// Assert that:
 ///   * the `rad` remote exists
-///   * its URL matches the `LocalUrl`
+///   * its URL matches the `RadRemoteUrl`
 ///   * the default branch exists under the remote
-fn assert_remote(repo: &git2::Repository, branch: &Cstring, url: &LocalUrl) -> anyhow::Result<()> {
+fn assert_remote(
+    repo: &git2::Repository,
+    branch: &Cstring,
+    url: &RadRemoteUrl,
+) -> anyhow::Result<()> {
     let rad = repo.find_remote("rad")?;
     assert_eq!(rad.url().unwrap(), &url.to_string());
 

@@ -19,9 +19,9 @@ use librad::{
         BoxedSigner,
         SomeSigner,
     },
-    git::local::{
-        transport::{CanOpenStorage, LocalTransport, Localio, Mode::Stateful, Settings},
-        url::LocalUrl,
+    git::{
+        local::transport::{CanOpenStorage, LocalTransport, Localio, Mode::Stateful, Settings},
+        rad_url::RadRemoteUrl,
     },
     profile::Profile,
     PublicKey,
@@ -53,7 +53,7 @@ See https://git-scm.com/docs/git-remote-ext for more detail."#
         args[0]
             .parse()
             .or_else(|_| args[1].parse())
-            .map_err(|_| anyhow::anyhow!("invalid args: {:?}", args))
+            .map_err(|e| anyhow::anyhow!("invalid args: {:?}: {}", args, e))
     }?;
 
     let git_dir = env::var("GIT_DIR").map(PathBuf::from)?;
@@ -89,7 +89,7 @@ See https://git-scm.com/docs/git-remote-ext for more detail."#
             println!();
 
             transport
-                .connect(url, service, Stateful, Localio::inherit())?
+                .connect(url.into(), service, Stateful, Localio::inherit())?
                 .wait()?;
 
             break;
@@ -101,7 +101,7 @@ See https://git-scm.com/docs/git-remote-ext for more detail."#
     Ok(())
 }
 
-fn get_signer(git_dir: &Path, keys_dir: &Path, url: &LocalUrl) -> anyhow::Result<BoxedSigner> {
+fn get_signer(git_dir: &Path, keys_dir: &Path, url: &RadRemoteUrl) -> anyhow::Result<BoxedSigner> {
     let mut cred = credential::Git::new(git_dir);
     let pass = cred.get(url)?;
     let file = keys_dir.join(SECRET_KEY_FILE);

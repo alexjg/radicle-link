@@ -2,7 +2,7 @@ use git_ref_format::{lit, name, refspec, Qualified, RefStr, RefString};
 
 use librad::{
     git::{
-        local::url::LocalUrl,
+        rad_url::RadRemoteUrl,
         types::{
             remote::{LocalFetchspec, LocalPushspec},
             Fetchspec,
@@ -126,7 +126,7 @@ where
     /// remote called "rad".
     pub fn fetch(&mut self, from: WorkingRemote) -> Result<(), anyhow::Error> {
         let fetchspec = from.fetchspec();
-        let url = LocalUrl::from(self.project.project.urn());
+        let url = RadRemoteUrl::from(self.project.project.urn());
         let mut remote = Remote::rad_remote(url, fetchspec);
         let _ = remote.fetch(self.peer.clone(), &self.repo, LocalFetchspec::Configured)?;
         Ok(())
@@ -134,7 +134,7 @@ where
 
     /// Push changes from `refs/heads/*` to the local peer
     pub fn push(&mut self) -> Result<(), anyhow::Error> {
-        let url = LocalUrl::from(self.project.project.urn());
+        let url = RadRemoteUrl::from(self.project.project.urn());
         let name = RefString::try_from("rad").unwrap();
         let fetchspec = Refspec {
             src: RefString::from_iter([name::REFS, name::HEADS]).with_pattern(refspec::STAR),

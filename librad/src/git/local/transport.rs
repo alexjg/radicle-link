@@ -24,7 +24,7 @@ use super::{
         types::Namespace,
         Urn,
     },
-    url::LocalUrl,
+    url::LocalTransportUrl,
 };
 use crate::paths::Paths;
 
@@ -72,12 +72,12 @@ pub trait CanOpenStorage: Send + Sync {
 
 pub(crate) fn with_local_transport<F, G, A>(
     open_storage: F,
-    url: LocalUrl,
+    url: LocalTransportUrl,
     g: G,
 ) -> Result<A, Error>
 where
     F: CanOpenStorage + 'static,
-    G: FnOnce(LocalUrl) -> A,
+    G: FnOnce(LocalTransportUrl) -> A,
 {
     internal::with(open_storage, url, g)
 }
@@ -178,7 +178,7 @@ impl LocalTransport {
     #[tracing::instrument(level = "debug", skip(self, service, stdio))]
     pub fn connect(
         &mut self,
-        url: LocalUrl,
+        url: LocalTransportUrl,
         service: Service,
         mode: Mode,
         stdio: Localio,

@@ -16,12 +16,7 @@ use it_helpers::{
 use librad::{
     canonical::Cstring,
     crypto::SecretKey,
-    git::{
-        identities::local,
-        local::{transport, url::LocalUrl},
-        util,
-        Storage,
-    },
+    git::{identities::local, local::transport, rad_url::RadRemoteUrl, util, Storage},
     git_ext::tree,
     reflike,
     PeerId,
@@ -57,7 +52,7 @@ fn local_checkout() -> anyhow::Result<()> {
     )?;
     let branch = proj.project.subject().default_branch.as_ref().unwrap();
     assert_head(&repo, branch)?;
-    assert_remote(&repo, branch, &LocalUrl::from(proj.project.urn()))?;
+    assert_remote(&repo, branch, &RadRemoteUrl::from(proj.project.urn()))?;
     Ok(())
 }
 
@@ -121,13 +116,13 @@ fn remote_checkout() {
             .unwrap();
         let branch = proj.project.subject().default_branch.as_ref().unwrap();
         assert_head(&repo, branch).unwrap();
-        assert_remote(&repo, branch, &LocalUrl::from(proj.project.urn())).unwrap();
+        assert_remote(&repo, branch, &RadRemoteUrl::from(proj.project.urn())).unwrap();
         assert_peer_remote(
             &repo,
             branch,
             &proj.owner.subject().name,
             &peer1.peer_id(),
-            &LocalUrl::from(proj.project.urn()),
+            &RadRemoteUrl::from(proj.project.urn()),
         )
         .unwrap();
     })
@@ -159,9 +154,13 @@ fn assert_head(repo: &git2::Repository, branch: &Cstring) -> anyhow::Result<()> 
 
 /// Assert that:
 ///   * the `rad` remote exists
-///   * its URL matches the `LocalUrl`
+///   * its URL matches the `RadRemoteUrl`
 ///   * its upstream branch is the default branch
-fn assert_remote(repo: &git2::Repository, branch: &Cstring, url: &LocalUrl) -> anyhow::Result<()> {
+fn assert_remote(
+    repo: &git2::Repository,
+    branch: &Cstring,
+    url: &RadRemoteUrl,
+) -> anyhow::Result<()> {
     let rad = repo.find_remote("rad")?;
     assert_eq!(rad.url().unwrap(), &url.to_string());
 
@@ -176,14 +175,14 @@ fn assert_remote(repo: &git2::Repository, branch: &Cstring, url: &LocalUrl) -> a
 
 /// Assert that:
 ///   * the peer remote exists
-///   * its URL matches the `LocalUrl`
+///   * its URL matches the `RadRemoteUrl`
 ///   * the refs/remotes/<handle>@<peer>/<branch> exists
 fn assert_peer_remote(
     repo: &git2::Repository,
     branch: &Cstring,
     handle: &Cstring,
     peer: &PeerId,
-    url: &LocalUrl,
+    url: &RadRemoteUrl,
 ) -> anyhow::Result<()> {
     let remote_name = format!("{}@{}", handle, peer);
     let remote = repo.find_remote(&remote_name)?;

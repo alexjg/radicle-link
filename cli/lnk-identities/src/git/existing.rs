@@ -8,7 +8,7 @@ use std::{fmt, marker::PhantomData, path::PathBuf};
 use serde::{Deserialize, Serialize};
 
 use librad::{
-    git::local::{transport::CanOpenStorage, url::LocalUrl},
+    git::{local::transport::CanOpenStorage, rad_url::RadRemoteUrl},
     git_ext,
     std_ext::result::ResultExt as _,
 };
@@ -91,7 +91,7 @@ impl fmt::Debug for Valid {
 }
 
 impl<P: HasBranch> Existing<Valid, P> {
-    pub fn init<F>(self, url: LocalUrl, open_storage: F) -> Result<git2::Repository, Error>
+    pub fn init<F>(self, url: RadRemoteUrl, open_storage: F) -> Result<git2::Repository, Error>
     where
         F: CanOpenStorage + Clone + 'static,
     {

@@ -10,7 +10,8 @@ use either::Either;
 use librad::{
     git::{
         identities::{self, Person},
-        local::{transport::CanOpenStorage, url::LocalUrl},
+        local::transport::CanOpenStorage,
+        rad_url::RadRemoteUrl,
         storage::ReadOnly,
         types::{
             remote::{LocalFetchspec, LocalPushspec, Remote},
@@ -137,7 +138,7 @@ where
 }
 
 pub struct Local {
-    url: LocalUrl,
+    url: RadRemoteUrl,
     path: PathBuf,
 }
 
@@ -147,12 +148,12 @@ impl Local {
         I: HasName + HasUrn,
     {
         Self {
-            url: LocalUrl::from(identity.urn()),
+            url: RadRemoteUrl::from(identity.urn()),
             path,
         }
     }
 
-    fn checkout<F>(self, open_storage: F) -> Result<(git2::Repository, Remote<LocalUrl>), Error>
+    fn checkout<F>(self, open_storage: F) -> Result<(git2::Repository, Remote<RadRemoteUrl>), Error>
     where
         F: CanOpenStorage + 'static,
     {
@@ -169,7 +170,7 @@ impl Local {
 }
 
 pub struct Peer {
-    url: LocalUrl,
+    url: RadRemoteUrl,
     remote: (Person, PeerId),
     default_branch: OneLevel,
     path: PathBuf,
@@ -183,14 +184,14 @@ impl Peer {
         let urn = identity.urn();
         let default_branch = identity.branch_or_die(urn.clone())?;
         Ok(Self {
-            url: LocalUrl::from(urn),
+            url: RadRemoteUrl::from(urn),
             remote,
             default_branch,
             path,
         })
     }
 
-    fn checkout<F>(self, open_storage: F) -> Result<(git2::Repository, Remote<LocalUrl>), Error>
+    fn checkout<F>(self, open_storage: F) -> Result<(git2::Repository, Remote<RadRemoteUrl>), Error>
     where
         F: CanOpenStorage + Clone + 'static,
     {

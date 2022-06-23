@@ -11,7 +11,8 @@ use librad::{
     crypto::{BoxedSigner, PublicKey},
     git::{
         identities::{self, person, relations, Person},
-        local::{transport, url::LocalUrl},
+        local::transport,
+        rad_url::RadRemoteUrl,
         storage::{ReadOnly, Storage},
         types::{Namespace, Reference},
         Urn,
@@ -83,7 +84,7 @@ where
     direct.extend(delegations.into_iter());
 
     let urn = person::urn(storage, payload.clone(), direct.clone())?;
-    let url = LocalUrl::from(urn);
+    let url = RadRemoteUrl::from(urn);
     let settings = transport::Settings {
         paths: paths.clone(),
         signer,

@@ -14,7 +14,10 @@ use std_ext::result::ResultExt as _;
 use thiserror::Error;
 
 use super::{
-    super::local::{self, transport::with_local_transport, url::LocalUrl},
+    super::{
+        local::{self, transport::with_local_transport, url::LocalTransportUrl},
+        rad_url::RadRemoteUrl,
+    },
     Fetchspec,
     Force,
     Pushspec,
@@ -203,7 +206,7 @@ impl<Url> Remote<Url> {
     }
 }
 
-/// What to push when calling `Remote::<LocalUrl>::push`.
+/// What to push when calling `Remote::<RadRemoteUrl>::push`.
 #[derive(Debug)]
 pub enum LocalPushspec {
     /// Read the matching refs from the repo at runtime.
@@ -220,7 +223,7 @@ pub enum LocalPushspec {
     Configured,
 }
 
-/// What to fetch when calling `Remote::<LocalUrl>::fetch`.
+/// What to fetch when calling `Remote::<RadRemoteUrl>::fetch`.
 #[derive(Debug)]
 pub enum LocalFetchspec {
     /// Use the provided [`Fetchspec`]s.
@@ -232,7 +235,7 @@ pub enum LocalFetchspec {
     Configured,
 }
 
-impl Remote<LocalUrl> {
+impl Remote<RadRemoteUrl> {
     /// Get the remote repository's reference advertisement list.
     #[tracing::instrument(skip(self, repo, open_storage))]
     pub fn remote_heads<F>(
@@ -244,7 +247,7 @@ impl Remote<LocalUrl> {
         F: local::transport::CanOpenStorage + 'static,
     {
         let heads: Result<Vec<(RefLike, git2::Oid)>, local::transport::Error> =
-            with_local_transport(open_storage, self.url.clone(), |url| {
+            with_local_transport(open_storage, self.url.clone().into(), |url| {
                 let mut git_remote = repo.remote_anonymous(&url.to_string())?;
                 git_remote.connect(git2::Direction::Fetch)?;
                 let heads = git_remote
@@ -333,9 +336,9 @@ impl Remote<LocalUrl> {
     where
         S: AsRef<str> + git2::IntoCString + Clone + std::fmt::Debug,
         F: local::transport::CanOpenStorage + 'static,
-        G: FnOnce(LocalUrl) -> Result<git2::Remote<'a>, git2::Error>,
+        G: FnOnce(LocalTransportUrl) -> Result<git2::Remote<'a>, git2::Error>,
     {
-        with_local_transport(open_storage, self.url.clone(), |url| {
+        with_local_transport(open_storage, self.url.clone().into(), |url| {
             let mut git_remote = open_remote(url)?;
             let mut updated_refs = Vec::new();
             let mut callbacks = git2::RemoteCallbacks::new();
@@ -410,9 +413,9 @@ impl Remote<LocalUrl> {
     where
         S: AsRef<str> + git2::IntoCString + Clone,
         F: local::transport::CanOpenStorage + 'static,
-        G: FnOnce(LocalUrl) -> Result<git2::Remote<'a>, git2::Error>,
+        G: FnOnce(LocalTransportUrl) -> Result<git2::Remote<'a>, git2::Error>,
     {
-        with_local_transport(open_storage, self.url.clone(), |url| {
+        with_local_transport(open_storage, self.url.clone().into(), |url| {
             let mut git_remote = open_remote(url)?;
             let mut updated_refs = Vec::new();
             let mut callbacks = git2::RemoteCallbacks::new();

@@ -13,7 +13,8 @@ use librad::{
     crypto::SecretKey,
     git::{
         identities::project::ProjectPayload,
-        local::{transport, url::LocalUrl},
+        local::transport,
+        rad_url::RadRemoteUrl,
         storage::Storage,
     },
 };
@@ -60,7 +61,7 @@ fn creation() -> anyhow::Result<()> {
         let storage = Storage::open(&*paths, signer.clone())?;
         let proj = TestProject::create(&storage)?;
         let urn = proj.project.urn();
-        let url = LocalUrl::from(urn);
+        let url = RadRemoteUrl::from(urn);
         let settings = transport::Settings {
             paths: paths.clone(),
             signer: signer.into(),
@@ -98,9 +99,13 @@ fn assert_head(repo: &git2::Repository, branch: &Cstring) -> anyhow::Result<()> 
 
 /// Assert that:
 ///   * the `rad` remote exists
-///   * its URL matches the `LocalUrl`
+///   * its URL matches the `RadRemoteUrl`
 ///   * its upstream branch is the default branch
-fn assert_remote(repo: &git2::Repository, branch: &Cstring, url: &LocalUrl) -> anyhow::Result<()> {
+fn assert_remote(
+    repo: &git2::Repository,
+    branch: &Cstring,
+    url: &RadRemoteUrl,
+) -> anyhow::Result<()> {
     let rad = repo.find_remote("rad")?;
     assert_eq!(rad.url().unwrap(), &url.to_string());
 

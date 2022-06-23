@@ -12,7 +12,7 @@ use std::{
 use it_helpers::fixed::TestProject;
 use librad::{
     crypto::keystore::{self, crypto, pinentry::SecUtf8, Keystore},
-    git::{local::url::LocalUrl, storage::Storage, Urn},
+    git::{rad_url::RadRemoteUrl, storage::Storage, Urn},
     paths::Paths,
     profile::Profile,
     PublicKey,
@@ -62,7 +62,7 @@ fn smoke() {
             .arg("-c")
             .arg(format!("credential.helper={}", credential_helper()))
             .arg("clone")
-            .arg(LocalUrl::from(urn).to_string())
+            .arg(RadRemoteUrl::from(urn).to_string())
             .arg(repo_dir.path())
             .env("PATH", &path)
             .env("LNK_HOME", lnk_dir.path())
@@ -113,7 +113,7 @@ fn setup_repo(path: &Path, origin: &Urn) -> anyhow::Result<()> {
     )?;
 
     repo.set_head("refs/heads/master")?;
-    repo.remote("origin", &LocalUrl::from(origin.clone()).to_string())?;
+    repo.remote("origin", &RadRemoteUrl::from(origin.clone()).to_string())?;
 
     let mut config = repo.config()?;
     config

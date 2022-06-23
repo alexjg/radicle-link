@@ -8,6 +8,7 @@ pub mod identities;
 pub mod include;
 pub mod local;
 pub mod p2p;
+pub mod rad_url;
 pub mod refs;
 
 pub mod storage;
