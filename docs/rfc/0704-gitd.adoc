@@ -1,0 +1,444 @@
+= RFC: Gitd
+Alex Good <alex@memoryandthought.me>;
++
+:revdate: 2022-06-27
+:revremark: draft
+:toc: preamble
+:stem:
+
+* Author: {author_1}
+* Date: {revdate}
+* Amended: {ammend_1}
+* Status: {revremark}
+
+== Motivation
+
+Users are used to working with remote git repositories using the git CLI suite.
+By implementing a git server which proxies the monorepo we can enable users to
+interact with Link identities using standard git tooling.
+
+== Overview
+
+The local view of the network is available in the monorepo as specified in 
+xref:./0001-identity_resolution.adoc#namespacing[Namespacing].
+
+To achieve transparent interaction with radicle remotes we expose a network
+endpoint which the git protocol understands and which performs two functions:
+
+1. Updating the local peers signed refs on push to a particular URN 
+2. Exposing remote peers refs in a manner compatible with the ref layout git
+   expects so that git commands such as `git fetch <remote> tag <tag>` work as
+   expected.
+
+We achieve this by implementing an SSH server which responds to git requests
+such that remotes of the form
+
+[source]
+----
+ssh://<host>/<urn>.git
+----
+
+Will work as expected. SSH URLs in git are fetched by connecting to the server
+and making an `exec` request (<<ssh-protocol-exec-request>>) for either 
+
+* `git-upload-pack <url>` in the case of fetching
+* `git-receive-pack <url>` in the case of pushing
+
+The `gitd` SSH server intercepts these and forwards them to a subprocess which
+runs either `git-upload-pack` or `git-receive-pack` in the monorepo with an
+additional `--namespace <urn>` so that only refs from the namespace in question
+are exposed. `gitd` then intercepts protocol messages running over the proxied
+standard input and output channels and rewrites refs so that the refs for each
+individual peer under the URN are in the conventional layout git expects. See
+<<appendix_bad_ref_layout>> for why the ref rewriting is necessary.
+
+In order to update the signed refs on pushes the `gitd` obtains the signing key
+from a running SSH agent.
+
+== Terminology and Conventions
+
+The key words "`MUST`", "`MUST NOT`", "`REQUIRED`", "`SHALL`", "`SHALL NOT`",
+"`SHOULD`", "`SHOULD NOT`", "`RECOMMENDED`", "`NOT RECOMMENDED`", "`MAY`", and
+"`OPTIONAL`" in this document are to be interpreted as described in <<RFC2119>>
+and <<RFC8174>> when, and only when, they appear in all capitals, as shown here.
+
+== Gitd SSH Interface
+
+The gitd server exposes an SSH server. Connections to  the SSH server MUST be
+authenticated using <<ssh-protocol-publickey>>. Once connected and authenticated
+the SSH server accepts `exec` requests <<ssh-protocol-exec-request>> with a
+command of either:
+
+* `git-upload-pack [<peer>@]rad:git:<urn>.git`
+* `git-receive-pack <urn>.git`
+
+Where `<peer>` is the base32-z encoded bytes of a peer ID and `<urn>` is a
+base32-z encoded link URN. If the command does not match either of these
+patterns `gitd` MUST respond with a `SSH_MESSAGE_CHANNEL_CLOSE` message. The
+`gitd` server MAY first send a UTF-8 encoded string describing the error as an
+extended data message with a `data_type_code` of `1`.
+
+The `gitd` server then invokes one of the following commands and proxies stdout
+and stderr through to the subprocess. The proxied stdin and stdout are subject
+to <<ref-rewriting>>.
+
+=== `git-upload-pack [peer@]rad:git:<urn>.git`
+
+The invoked command MUST be
+
+[source,bash]
+----
+git upload-pack \
+    --namespace <urn> \
+    -c transfer.hiderefs=refs/remotes \
+    -c transfer.hiderefs=refs/remotes/rad \
+    -c transfer.hiderefs=refs/remotes/cobs \
+    -c uploadpack.hiderefs=!^$UNHIDDEN <1>
+----
+<1> This line is repeated for each visible ref in each remote in the namespace.
+A visible ref is one which matches `refs/remotes/<remote>/^(rad|cobs)`. I.e.
+everything except the `rad` and `cobs` category of refs under the remote.
+
+=== `git-receive-pack rad:git:<urn>.git`
+
+The invoked command MUST be
+
+[source,bash]
+----
+git upload-pack \
+    --namespace <urn> \
+    -c transfer.hiderefs=refs/remotes \
+    -c transfer.hiderefs=refs/remotes/rad \
+    -c transfer.hiderefs=refs/remotes/cobs \
+    -c uploadpack.hiderefs=!^$UNHIDDEN <1>
+----
+
+When the server receives an `exec` request for a `git-receive-pack` request it
+MUST ensure that the authenticated public key for the request is the public key
+corresponding to the signing key of the monorepo it proxies. If the public key
+does not match the server MUST respond with an `SSH_MESSAGE_CHANNEL_CLOSE` and
+MAY first send a UTF-8 encoded string describing the error as an extended data
+message with a `data_type_code` of `1`.
+
+Once the subprocess has completed `gitd` MUST attempt to update the signed refs
+for the namespace in question. To do this `gitd` attempts to retrieve a key from
+the SSH agent running at `$SSH_AUTH_SOCK`. If this is not possible then `gitd`
+MUST report an error as an extended data messaage with a `data_type_code` of `1`.
+
+=== Environment variables
+
+If the client issues a channel request of type `"env"` before sending an `exec`
+request then `gitd` MUST store the associated name and value and pass those
+values into the environment of invoked subprocesses for that channel.
+
+
+[#ref-rewriting]
+== Peer URLs and ref rewriting
+
+Once the `gitd` has started a git subprocess and is proxying data from the SSH
+client to the subprocess then the remaining responsibility of `gitd` is to
+intercept the git protocol messages running over the proxied streams and rewrite
+some refs. Concretely, if the URL that was passed to the `exec` command was of
+the form `<peer>@rad:git:<urn>.git` (it contains a peer ID) then `gitd` MUST
+rewrite refs as follows, otherwise `gitd` MUST NOT rewrite refs.
+
+=== Rewrite Rules
+
+In abstract the rewriting `gitd` must perform is one of the following rules:
+
+* The incoming rule :: When sending data to the `git` subprocess if the incoming
+  (_from_ the `SSH` client) ref matches `refs/<remainder>` it MUST be rewritten
+  to `refs/remotes/<peer_id>/<remainder>` before passing to the `git` subprocess
+* The outgoing rule :: When receiving data from the `git` subprocess, if the
+  outgoing (_to_ the `SSH` client) ref matches `refs/remotes/<peer
+  id>/<remainder>` it MUST be rewritten to `refs/<remainder>`.
+
+The following sections specify specifically what parts of the git protocol
+messages must be rewritten for each command. 
+
+=== Upload pack
+
+After starting the `git-upload-pack` subprocess `gitd` intercepts the first
+PKT-LINE of output. If the line is `PKT-LINE("version 2" LF)` then `gitd` MUST
+pass the line through verbatim to the `SSH` client and proceed as according to
+<<protocol-v2-rewriting>>.
+
+If the first line is `PKT-LINE("version 1" LF)` then `gitd` MUST pass the line
+through verbatim to the `SSH` client and continue as per
+<<v1-reference-discovery-rewriting>>.
+
+If the first line is neither of the above then it is the first line of reference
+discovery and `gitd` MUST proceed as per <<v1-reference-discovery-rewriting>>.
+
+Once the reference discovery step is complete all remaining input and output is
+proxied without modification.
+
+=== Receive Pack
+
+After starting the `git-receive-pack` subprocess `gitd` intercepts the first
+PKT-LINE of output. If the line is `PKT-LINE("version 2" LF)` then `gitd` MUST
+pass the line through verbatim to the `SSH` client and proceed as according to
+<<protocol-v2-rewriting>>.
+
+If the first line is `PKT-LINE("version 1" LF)` then `gitd` MUST pass the line
+through verbatim to the `SSH` client and continue as per
+<<v1-reference-discovery-rewriting>>.
+
+If the first line is neither of the above then it is the first line of reference
+discovery and `gitd` MUST proceed as per <<v1-reference-discovery-rewriting>>.
+
+Once reference discovery is complete the `SSH` client process will send
+reference update requests as per <<git-protocol-reference-update-request>>.
+`gitd` MUST execute the following pseudocode:
+
+[source]
+----
+loop 
+    let next_line = read_pkt_line_from_client()
+    if next_line is flush packet
+        send_to_subprocess(flush_packet)
+        break
+    else
+        if next_line is command <1>
+            rewritten = <rewrite refname in command according to incoming rule>
+        else
+            rewritten = next_line
+        send_to_subprocess(rewritten)
+----
+<1> A command is a packet line which matches `<oid> SP <oid> SP name`
+
+Once this loop is complete `gitd` MUST proxy all further input and output
+without modification.
+
+[#v1-reference-discovery-rewriting]
+=== V1 Reference Discovery Rewriting
+
+In both `git-upload-pack` and `git-receive-pack` the subprocess begins by
+outputting all the references it knows about as per  the grammer under "Reference
+Discovery" in <<<git-protocol-v1>>> which is repeated verbatim here:
+
+[source]
+----
+  advertised-refs  =  *1("version 1")
+		      (no-refs / list-of-refs)
+		      *shallow
+		      flush-pkt
+
+  no-refs          =  PKT-LINE(zero-id SP "capabilities^{}"
+		      NUL capability-list)
+
+  list-of-refs     =  first-ref *other-ref
+  first-ref        =  PKT-LINE(obj-id SP refname
+		      NUL capability-list)
+
+  other-ref        =  PKT-LINE(other-tip / other-peeled)
+  other-tip        =  obj-id SP refname
+  other-peeled     =  obj-id SP refname "^{}"
+
+  shallow          =  PKT-LINE("shallow" SP obj-id)
+
+  capability-list  =  capability *(SP capability)
+  capability       =  1*(LC_ALPHA / DIGIT / "-" / "_")
+  LC_ALPHA         =  %x61-7A
+----
+
+`gitd` starts by parsing the first line. The ref in the first line MUST be
+rewritten as per the outgoing rewrite rule. If there is a `symref` capability in
+the `capabilities` list (<<git-protocol-symref-capability>>) then `gitd` MUST
+rewrite the ref in the `symref` as per the outgoing rewrite rule. This rewritten
+packet line must then be sent to the `SSH` client.
+
+Once this first line is complete `gitd` MUST execute the following algorithm
+
+[source]
+----
+loop 
+    let next_line = read_pkt_line_from_subprocess()
+    if next_line is flush packet
+        send_to_ssh_client(flush_packet)
+        break
+    else
+        if next_line is other-ref
+            rewritten = <rewrite refname in next_line according to outgoing rule>
+        else
+            rewritten = next_line
+        send_to_ssh_client(rewritten)
+----
+
+Once this loop terminates the reference discovery step is complete.
+
+[#protocol-v2-rewriting]
+=== Protocol v2
+
+Protocol v2 is defined in <<<git-protocol-v2>>>. Protocol v2 is defined in terms
+of commands which are sent by the client (the `SSH` client here) to the server
+(the subprocess). The grammar in <<git-protocol-v2>> is repeated verbatim here:
+
+[source]
+----
+request = empty-request | command-request
+empty-request = flush-pkt
+command-request = command
+    capability-list
+    delim-pkt
+    command-args
+    flush-pkt
+command = PKT-LINE("command=" key LF)
+command-args = *command-specific-arg
+----
+
+While the client has an open connection to `gitd` then `gitd` MUST attempt to
+read the next `command` `PKT-LINE` from the `SSH` client. For each command:
+
+* If the `command` is `ls-refs` then proceed as according to
+  <<protocol-v2-ls-refs>>
+* If the `command` is `fetch` then proceed as accoding to <<protocol-v2-fetch>>
+* Otherwise `gitd` MUST read the remainder of the command and pass the whole
+  `command-request` through to the subprocess. `gitd` MUST then read from the
+  subprocess until a flush packet is read passing everything through to the
+  `SSH` client
+
+[#protocol-v2-ls-refs]
+==== `ls-refs`
+
+`gitd` MUST parse the command arguments of the `ls-refs` command. For each
+`ref-prefix` argument `gitd` MUST rewrite the ref according to the incoming
+rewrite rule. Once this rewriting is complete the entire command MUST be passed
+to the subprocess. 
+
+The subprocess will now respond with the following:
+
+[source]
+----
+output = *ref
+  flush-pkt
+obj-id-or-unborn = (obj-id | "unborn")
+ref = PKT-LINE(obj-id-or-unborn SP refname *(SP ref-attribute) LF)
+ref-attribute = (symref | peeled)
+symref = "symref-target:" symref-target
+peeled = "peeled:" obj-id
+----
+
+`gitd` MUST read from the subprocess until a flush packet is received executing
+the following pseudocode
+
+[source]
+----
+loop
+    let next_line = read_pkt_line_from_subprocess()
+    if line is flush
+        send_to_subprocess(line)
+        break
+    if line is ref
+        rewritten = PKT_LINE(obj-id-or-unborn SP rewrite(refname) SP rewrite(attributes) LF) <1> <2>
+    else
+        rewritten = next_line
+    send_to_subprocess(rewritten)
+----
+<1> `rewrite(refname)` means rewrite `refname` according to the outgoing rewrite
+    rule
+<2> `rewrite(attributes)` means for each attribute in the attributes, if the
+    attribute is a `symref` then rewrite `symref-target` according to the outgoing
+    rewrite rule
+
+==== `fetch`
+
+`gitd` MUST parse the command arguments of the fetch command. For each argument,
+if the argument name is `want-ref` then the argument value MUST be rewritten
+according to the incoming rewrite rule, otherwise the argument must be left as
+is. Once this rewriting is complete the command MUST be passed to the
+subprocess.
+
+Once the command has been sent to the subprocess `gitd` MUST execute the
+following pseudocode to rewrite the `wanted-refs` section of the response:
+
+[source]
+----
+loop
+    let next_line = read_pkt_line_from_client()
+    if next_line is PKT-LINE("wanted-refs")
+        loop
+            let next_ref = read_pkt_line_from_client()
+            if next_ref is delimiter_packet
+                send_to_subprocess(delimiter_packet)
+                break
+            let rewritten = rewrite(next_ref) <1>
+            send_to_subprocess(rewritten)
+    else if next_line is flush_packet
+        send_to_subprocess(next_line)
+        break
+    else
+        send_to_subprocess(next_line)
+----
+<1> The `wanted-ref` argument has the form `obj-id SP refname`. Rewriting this
+    means rewriting the refname according to the incoming rewrite rule.
+
+Once this loop is complete the command handling is complete.
+
+[appendix]
+[[appendix_bad_ref_layout,Appendix A: Ref Layout Mismatch]]
+== Ref Layout Mismatch
+
+Why do we need to do ref rewriting? Imagine a `gitd` running at `127.0.0.1:9999`
+which does everything specified here (specifically wrapping git commands and
+calling them in a monorepo with a `--namespace` argument) but which _does not_ 
+rewrite refs. Given such a `gitd` the following URL will provide all refs under
+a given namespace
+
+[source]
+----
+ssh://127.0.0.1:9999/rad:git:<encoded namespace>
+----
+
+We can then create remotes like this:
+
+[source]
+----
+[remote "collaborator"]
+	url = ssh://127.0.0.1:9999/rad:git:<urn>
+	fetch = +refs/remotes/<peer id>/heads/*:refs/remotes/collaborator/*
+----
+
+`git fetch` will do the right thing here and fetch all the remote branches into
+`refs/remotes/collaborator/*`. Unfortunately commands which reference a
+particular branch or tag will not do the right thing. For example, `git fetch
+collaborator mybranch` will attempt to fetch `refs/heads/<mybranch>`, which
+doesn't exist. This is due to the following lines from the git fetch docs
+<<git-fetch-docs>>.
+
+[quote]
+When `git fetch` is run with explicit branches and/or tags to fetch on the
+command line, e.g. `git fetch origin master`, the ``<refspec>``s given on the
+command line determine what are to be fetched (e.g. `master` in the example,
+which is a short-hand for `master:`, which in turn means "fetch the master
+branch but I do not explicitly say what remote-tracking branch to update with it
+from the command line"), and the example command will fetch only the master
+branch. The `remote.<repository>.fetch` values determine which remote-tracking
+branch, if any, is updated. When used in this way, the
+`remote.<repository>.fetch` values do not have any effect in deciding what gets
+fetched (i.e. the values are not used as refspecs when the command-line lists
+refspecs); they are only used to decide where the refs that are fetched are
+stored by acting as a mapping.
+
+This behaviour doesn't appear to be configurable, there is no way to tell git
+that `git fetch <remote> <branch>` should fetch `refs/remotes/<peer
+id>/refs/heads/<branch>` and likewise no way to say that `git fetch <remote> tag
+<tag>` should fetch `refs/remotes/<peer id>/refs/tags/<tag>`. However, we do
+control the `gitd` process, so we can make `gitd` rewrite refs to achieve the
+same thing.
+
+
+[bibliography]
+== References
+
+* [[[git-fetch-docs]]] https://git-scm.com/docs/git-fetch#_configured_remote_tracking_branches
+* [[[RFC2119]]] https://www.rfc-editor.org/rfc/rfc2119>
+* [[[RFC8174]]] https://www.rfc-editor.org/rfc/rfc8174>>
+* [[[git-protocol-v1]]] https://git-scm.com/docs/pack-protocol
+* [[[git-protocol-common]]] https://git-scm.com/docs/protocol-common
+* [[[git-protocol-v2]]] https://www.git-scm.com/docs/protocol-v2
+* [[[git-protocol-capability-advertisment]]] https://git-scm.com/docs/protocol-v2#_capability_advertisement
+* [[[git-protocol-symref-capability]]] https://git-scm.com/docs/protocol-capabilities#_symref
+* [[[git-protocol-reference-update-request]]] https://git-scm.com/docs/pack-protocol#_reference_update_request_and_packfile_transfer
+* [[[ssh-protocol-publickey]]] https://datatracker.ietf.org/doc/html/rfc4252#section-7
+* [[[ssh-protocol-exec-request]]] https://datatracker.ietf.org/doc/html/rfc4254#section-6.5
