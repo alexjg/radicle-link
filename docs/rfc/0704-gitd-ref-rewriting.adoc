@@ -1,0 +1,233 @@
+= RFC: gitd ref rewriting
+Alex Good <alex@memoryandthought.me>;
++
+:revdate: 2022-06-27
+:revremark: draft
+:toc: preamble
+:stem:
+
+* Author: {author_1}
+* Date: {revdate}
+* Amended: {ammend_1}
+* Status: {revremark}
+
+== Motivation
+
+`lnk-gitd` provides a local git interface to the monorepo which allows clients
+to interact with a particular namespace using vanilla git. This is intended to
+allow seamless interaction with radicle remotes without having to learn new
+tools. Due to some details of the way that git handles remote refspecs we will
+need to rewrite refs in the gitd to make this work.
+
+== Terminology and Conventions
+
+The key words "`MUST`", "`MUST NOT`", "`REQUIRED`", "`SHALL`", "`SHALL NOT`",
+"`SHOULD`", "`SHOULD NOT`", "`RECOMMENDED`", "`NOT RECOMMENDED`", "`MAY`", and
+"`OPTIONAL`" in this document are to be interpreted as described in <<RFC2119>>
+and <<RFC8174>> when, and only when, they appear in all capitals, as shown here.
+
+== The Problem
+
+Given a local `gitd` running at `127.0.0.1:9999` the following URL will provide
+all refs under a given namespace
+
+[source]
+----
+ssh://127.0.0.1:9999/rad:git:<encoded namespace>
+----
+
+We can then create remotes like this:
+
+[source]
+----
+[remote "collaborator"]
+	url = ssh://127.0.0.1:9999/rad:git:<urn>
+	fetch = +refs/remotes/<peer id>/heads/*:refs/remotes/collaborator/*
+----
+
+`git fetch` will do the right thing here and fetch all the remote branches into
+`refs/remotes/collaborator/*`. Unfortunately commands which reference a
+particular branch or tag will not do the right thing. For example, `git fetch
+collaborator mybranch` will attempt to fetch `refs/heads/<mybranch>`, which
+doesn't exist. This is due to the following lines from the git fetch docs
+<<git-fetch-docs>>.
+
+[quote]
+When `git fetch` is run with explicit branches and/or tags to fetch on the
+command line, e.g. `git fetch origin master`, the ``<refspec>``s given on the
+command line determine what are to be fetched (e.g. `master` in the example,
+which is a short-hand for `master:`, which in turn means "fetch the master
+branch but I do not explicitly say what remote-tracking branch to update with it
+from the command line"), and the example command will fetch only the master
+branch. The `remote.<repository>.fetch` values determine which remote-tracking
+branch, if any, is updated. When used in this way, the
+`remote.<repository>.fetch` values do not have any effect in deciding what gets
+fetched (i.e. the values are not used as refspecs when the command-line lists
+refspecs); they are only used to decide where the refs that are fetched are
+stored by acting as a mapping.
+
+This behaviour doesn't appear to be configurable, there is no way to tell git
+that `git fetch <remote> <branch>` should fetch `refs/remotes/<peer
+id>/refs/heads/<branch>` and likewise no way to say that `git fetch <remote> tag
+<tag>` should fetch `refs/remotes/<peer id>/refs/tags/<tag>`. However, we do
+control the `gitd` process, so we can make `gitd` rewrite refs to achieve the
+same thing.
+
+== Peer URLs and ref rewriting
+
+The desired outcome is that `git fetch <remote> <branch>` and `git fetch
+<remote> tag <tag>` should fetch the correct refs from the monorepo. To achieve
+these we define a new URL for requests from the `gitd` which will be subject to
+ref rewriting for fetch operations (`git-upload-pack`). Remotes can then point
+at these URLs to fetch refs from particular peers.
+
+When the `gitd` SSH server receives an exec request with a request of the form
+
+[source]
+----
+git-upload-pack rad:git:<encoded urn>/<peer id>.git <1> <2>
+----
+<1> encoded URN is the base32-z encoding of the URN
+<2> peer id is the base32-z encoding of the peer ID
+
+`gitd` MUST parse the refs of the incoming request and rewrite them. In abstract
+the rewriting rules are:
+
+* The incoming rule :: When sending data to the `git` subprocess `gitd`, if the
+  incoming (_from_ the `git` client) ref matches `refs/<remainder>` it MUST be
+  rewritten to `refs/remotes/<peer_id>/<remainder>` before passing to the `git`
+  subprocess
+* The outgoing rule :: When receiving data from the `git` subprocess, if the
+  outgoing (_to_ the `git` client) ref matches `refs/remotes/<peer
+  id>/<remainder>` it MUST be rewritten to `refs/<remainder>`.
+
+In all other cases messages MUST be left unchanged
+
+In the following sections we specify specifically what parts of the git protocol
+messages must be rewritten.
+
+Note that these sections depend on the PKT-LINE format defined in the git
+protocol documentation <<git-protocol-common>>.
+
+
+=== Protocol v1
+
+This section references grammers defined in <<<git-protocol-v1>>>. In protocol
+v1 there are distinct phases of operation, the only phase which requires
+rewriting is the "Reference Discovery" phase.
+
+In this phase the server returns a list of references. These references appear
+in the grammer under "Reference Discovery" in <<<git-protocol-v1>>> like so:
+
+[source]
+----
+  advertised-refs  =  *1("version 1")
+		      (no-refs / list-of-refs)
+		      *shallow
+		      flush-pkt
+
+  no-refs          =  PKT-LINE(zero-id SP "capabilities^{}"
+		      NUL capability-list)
+
+  list-of-refs     =  first-ref *other-ref
+  first-ref        =  PKT-LINE(obj-id SP refname
+		      NUL capability-list)
+
+  other-ref        =  PKT-LINE(other-tip / other-peeled)
+  other-tip        =  obj-id SP refname
+  other-peeled     =  obj-id SP refname "^{}"
+
+  shallow          =  PKT-LINE("shallow" SP obj-id)
+
+  capability-list  =  capability *(SP capability)
+  capability       =  1*(LC_ALPHA / DIGIT / "-" / "_")
+  LC_ALPHA         =  %x61-7A
+----
+
+In `gitd` this response is forwarded from a `git` subprocess to the SSH client.
+`gitd` MUST transform all appearances of `refname` as according to the outgoing
+rewrite rule.
+
+
+=== Protocol v2
+
+Protocol v2 is defined in <<<git-protocol-v2>>>. Protocol v2 is defined in terms
+of commands. The two commands we are concerned with are `ls-refs`,  and `fetch`.
+Each command is formatted like so:
+
+[source]
+----
+request = empty-request | command-request
+empty-request = flush-pkt
+command-request = command
+    capability-list
+    delim-pkt
+    command-args
+    flush-pkt
+command = PKT-LINE("command=" key LF)
+command-args = *command-specific-arg
+----
+
+==== `ls-refs`
+
+===== Request
+
+`ls-refs` includes zero or more `ref-prefix` argument. Each argument is a
+`PKT-LINE` framed message of the form `ref-prefix <prefix>`. When passing this
+data through to the `git` subprocess `gitd` MUST rewrite the prefix as according
+to the incoming rewrite rule.
+
+
+===== Response
+
+The response of `ls-refs` is as follows: 
+
+[source]
+----
+output = *ref
+  flush-pkt
+obj-id-or-unborn = (obj-id | "unborn")
+ref = PKT-LINE(obj-id-or-unborn SP refname *(SP ref-attribute) LF)
+ref-attribute = (symref | peeled)
+symref = "symref-target:" symref-target
+peeled = "peeled:" obj-id
+----
+
+`gitd` intercepts this output before sending it back to the SSH client and
+transforms it as follows:
+
+For each `ref` line 
+
+* `refname` MUST be transformed according to the outgoing rewritine rules
+* If the ref has a `ref-attribute` which is a `symref` then the `symref-target`
+  MUST be transformed according to the outgoing rewrite rules
+
+==== `fetch`
+
+Fetch takes the following arguments which must be modified:
+
+* `want-ref <ref>` :: Each `ref` MUST be rewritten according to the incoming
+  rewrite rule
+
+The fetch response has several sections, the only section we concern ourselves
+with is the `wanted-refs` section which has the form:
+
+[source]
+----
+wanted-refs = PKT-LINE("wanted-refs" LF)
+*PKT-LINE(wanted-ref LF)
+wanted-ref = obj-id SP refname
+----
+
+Here we rewrite `refname` using the outgoing rewrite rule.
+
+
+[bibliography]
+== References
+
+* [[[git-fetch-docs]]] https://git-scm.com/docs/git-fetch#_configured_remote_tracking_branches
+* [[[RFC2119]]] https://www.rfc-editor.org/rfc/rfc2119>
+* [[[RFC8174]]] https://www.rfc-editor.org/rfc/rfc8174>>
+* [[[git-protocol-v1]]] https://git-scm.com/docs/pack-protocol
+* [[[git-protocol-common]]] https://git-scm.com/docs/protocol-common
+* [[[git-protocol-v2]]] https://www.git-scm.com/docs/protocol-v2
