@@ -34,25 +34,28 @@
 //! # Implementation Notes
 //!
 //! This module starts with the basic value types which are part of the public
-//! API: `ObjectId`, and `TypeName`, all of which compose a `CollaborativeObject`. When loading a
-//! `CollaborativeObject` we attempt to load a graph of the automerge changes that make up the
-//! object from references to the object ID in the `RefsStorage` we have been passed. There are two
-//! representations of a change graph. Firstly there is `change_graph::ChangeGraph`, which is a
-//! full directed graph containing all the commits we can find for the given object. `ChangeGraph`
-//! has an `evaluate` method which traverses this directed graph validating each change with
-//! respect to their signatures, the schema, and the access control policy (only maintainers may
-//! make changes). Secondly there is the `cache::CachedChangeGraph`, this is a representation that
-//! contains only the automerge history of a fully evaluated change graph and the OIDs of the tips
-//! of the graph that was used to generate the changes. For any of the CRUD methods we first
-//! attempt to load a `CachedChangeGraph` from the cache, and if that fails (either because there is
-//! no cached object at all, or because the reference to the tips returned by the `RefsStorage` is
-//! different to those that were used to generate the cache) then we fall back to evaluating the
-//! full change graph of the object.
+//! API: `ObjectId`, and `TypeName`, all of which compose a
+//! `CollaborativeObject`. When loading a `CollaborativeObject` we attempt to
+//! load a graph of the automerge changes that make up the object from
+//! references to the object ID in the `RefsStorage` we have been passed. There
+//! are two representations of a change graph. Firstly there is
+//! `change_graph::ChangeGraph`, which is a full directed graph containing all
+//! the commits we can find for the given object. `ChangeGraph`
+//! has an `evaluate` method which traverses this directed graph validating each
+//! change with respect to their signatures, the schema, and the access control
+//! policy (only maintainers may make changes). Secondly there is the
+//! `cache::CachedChangeGraph`, this is a representation that contains only the
+//! automerge history of a fully evaluated change graph and the OIDs of the tips
+//! of the graph that was used to generate the changes. For any of the CRUD
+//! methods we first attempt to load a `CachedChangeGraph` from the cache, and
+//! if that fails (either because there is no cached object at all, or because
+//! the reference to the tips returned by the `RefsStorage` is different to
+//! those that were used to generate the cache) then we fall back to evaluating
+//! the full change graph of the object.
 //!
-//! Individual changes within a `ChangeGraph` are represented by a `change::Change` which
-//! represents commits with a particular set of trailers and which point to trees containing a
-//! particular set of objects. 
-//!
+//! Individual changes within a `ChangeGraph` are represented by a
+//! `change::Change` which represents commits with a particular set of trailers
+//! and which point to trees containing a particular set of objects.
 use std::{cell::RefCell, collections::BTreeSet, convert::TryFrom, fmt, rc::Rc, str::FromStr};
 
 use serde::{Deserialize, Serialize};
@@ -64,29 +67,19 @@ use radicle_git_ext as ext;
 mod authorizing_identity;
 pub use authorizing_identity::{AuthDecision, AuthorizingIdentity};
 
-mod change_metadata;
 mod trailers;
 
 mod change_graph;
 use change_graph::ChangeGraph;
 
-pub mod schema;
-pub use schema::Schema;
-
 mod change;
 use change::Change;
-
-mod schema_change;
-use schema_change::SchemaChange;
 
 mod refs_storage;
 pub use refs_storage::{ObjectRefs, RefsStorage};
 
 mod cache;
 use cache::{Cache, CachedChangeGraph};
-
-mod validated_automerge;
-use validated_automerge::ValidatedAutomerge;
 
 mod identity_storage;
 pub use identity_storage::IdentityStorage;
@@ -100,10 +93,7 @@ pub mod internals {
     //! This module exposes implementation details of the collaborative object
     //! crate for use in testing
 
-    pub use super::{
-        cache::{Cache, CachedChangeGraph, FileSystemCache},
-        validated_automerge::ValidatedAutomerge,
-    };
+    pub use super::cache::{Cache, CachedChangeGraph, FileSystemCache};
 }
 
 /// The typename of an object. Valid typenames MUST be sequences of alphanumeric
@@ -219,9 +209,6 @@ pub struct CollaborativeObject {
     history: History,
     /// The id of the object
     id: ObjectId,
-    /// The schema any changes to this object must respect
-    #[allow(unused)]
-    schema: Schema,
 }
 
 impl From<Rc<RefCell<CachedChangeGraph>>> for CollaborativeObject {
@@ -232,7 +219,6 @@ impl From<Rc<RefCell<CachedChangeGraph>>> for CollaborativeObject {
             typename: tg.typename().clone(),
             history: tg.history().clone(),
             id: tg.object_id(),
-            schema: tg.schema().clone(),
         }
     }
 }
@@ -265,13 +251,7 @@ pub struct ChangeGraphInfo {
 }
 
 pub mod error {
-    pub use super::schema::error::Parse as SchemaParse;
-    use super::{
-        cache::Error as CacheError,
-        change,
-        change_graph::Error as ChangeGraphError,
-        schema_change,
-    };
+    use super::{cache::Error as CacheError, change, change_graph::Error as ChangeGraphError};
     use thiserror::Error;
 
     use radicle_git_ext::FromMultihashError as ExtOidFromMultiHashError;
@@ -285,13 +265,9 @@ pub mod error {
         #[error("Invalid automerge history")]
         InvalidAutomergeHistory,
         #[error(transparent)]
-        CreateSchemaChange(#[from] schema_change::error::Create),
-        #[error(transparent)]
         CreateChange(#[from] change::error::Create),
         #[error(transparent)]
         Refs(RefsError),
-        #[error(transparent)]
-        Propose(#[from] super::validated_automerge::error::ProposalError),
         #[error(transparent)]
         Cache(#[from] CacheError),
         #[error(transparent)]
@@ -329,8 +305,6 @@ pub mod error {
         #[error(transparent)]
         Git(#[from] git2::Error),
         #[error(transparent)]
-        Propose(#[from] super::validated_automerge::error::ProposalError),
-        #[error(transparent)]
         Io(#[from] std::io::Error),
         #[error("signer must belong to the author")]
         SignerIsNotAuthor,
@@ -351,8 +325,6 @@ pub mod error {
 
 /// The data required to create a new object
 pub struct CreateObjectArgs<'a, R: RefsStorage, P: AsRef<std::path::Path>> {
-    /// A valid JSON schema which uses the vocabulary at <https://alexjg.github.io/automerge-jsonschema/spec>
-    pub schema: Schema,
     /// The CRDT history to initialize this object with
     pub contents: EntryContents,
     /// The typename for this object
@@ -376,9 +348,8 @@ pub struct CreateObjectArgs<'a, R: RefsStorage, P: AsRef<std::path::Path>> {
 }
 
 impl<'a, R: RefsStorage, P: AsRef<std::path::Path>> CreateObjectArgs<'a, R, P> {
-    fn change_spec(&self, schema_commit: git2::Oid) -> change::NewChangeSpec {
+    fn change_spec(&self) -> change::NewChangeSpec {
         change::NewChangeSpec {
-            schema_commit,
             typename: self.typename.clone(),
             tips: None,
             message: self.message.clone(),
@@ -398,29 +369,17 @@ pub fn create_object<R: RefsStorage, P: AsRef<std::path::Path>>(
         authorizing_identity,
         ref contents,
         ref typename,
-        ref schema,
         ..
     } = args;
     if !is_signer_for(signer, author) {
         return Err(error::Create::SignerIsNotAuthor);
     }
-    let schema_change = schema_change::SchemaChange::create(
-        authorizing_identity.content_id(),
-        author.content_id.into(),
-        repo,
-        signer,
-        schema.clone(),
-    )?;
-
-    let mut valid_history = ValidatedAutomerge::new(schema.clone());
-    valid_history.propose_change(contents.as_ref())?;
-
     let init_change = change::Change::create(
         authorizing_identity.content_id(),
         author.content_id.into(),
         repo,
         signer,
-        args.change_spec(schema_change.commit()),
+        args.change_spec(),
     )
     .map_err(error::Create::from)?;
 
@@ -438,8 +397,6 @@ pub fn create_object<R: RefsStorage, P: AsRef<std::path::Path>>(
     let mut cache = open_cache(args.cache_dir)?;
     let cached_graph = CachedChangeGraph::new(
         std::iter::once(init_change.author_commit()),
-        schema.clone(),
-        init_change.schema_commit(),
         history,
         typename.clone(),
         object_id,
@@ -451,7 +408,6 @@ pub fn create_object<R: RefsStorage, P: AsRef<std::path::Path>>(
         authorizing_identity_urn: authorizing_identity.urn(),
         typename: args.typename,
         history,
-        schema: args.schema,
         id: init_change.commit().into(),
     })
 }
@@ -592,8 +548,6 @@ pub fn update<R: RefsStorage, I: IdentityStorage, P: AsRef<std::path::Path>>(
     .load_or_materialize::<error::Update<R::Error>, _>(identity_storage, cache.as_mut(), repo)?
     .ok_or(error::Update::NoSuchObject)?;
 
-    cached.borrow_mut().propose_change(&changes)?;
-
     let change = change::Change::create(
         authorizing_identity.content_id(),
         author.content_id.into(),
@@ -601,7 +555,6 @@ pub fn update<R: RefsStorage, I: IdentityStorage, P: AsRef<std::path::Path>>(
         signer,
         change::NewChangeSpec {
             tips: Some(cached.borrow().tips().iter().cloned().collect()),
-            schema_commit: cached.borrow().schema_commit(),
             contents: changes.clone(),
             typename: typename.clone(),
             message,
@@ -711,8 +664,6 @@ impl<'a> CobRefs<'a> {
                     let object = graph.evaluate(identity_storage);
                     let cached = cache::CachedChangeGraph::new(
                         tip_oids,
-                        graph.schema().clone(),
-                        graph.schema_commit(),
                         object.history.clone(),
                         self.typename.clone(),
                         self.oid,

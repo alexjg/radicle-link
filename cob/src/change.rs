@@ -3,12 +3,7 @@
 // This file is part of radicle-link, distributed under the GPLv3 with Radicle
 // Linking Exception. For full terms see the included LICENSE file.
 
-use super::{
-    trailers,
-    EntryContents,
-    HistoryType,
-    TypeName,
-};
+use super::{trailers, EntryContents, HistoryType, TypeName};
 
 use git_trailers::{parse as parse_trailers, OwnedTrailer};
 use link_crypto::BoxedSigner;
@@ -32,9 +27,10 @@ pub struct Change {
     /// The OID of the parent commit of this change which points at the author
     /// identity
     author_commit: git2::Oid,
-    /// The OID of the parent commit of this change which points at a schema. Schemas are no longer
-    /// used but older implementations include a schema commit as a parent of the change and to
-    /// stay backwards compatible we must exclude these commits when loading a change.
+    /// The OID of the parent commit of this change which points at a schema.
+    /// Schemas are no longer used but older implementations include a
+    /// schema commit as a parent of the change and to stay backwards
+    /// compatible we must exclude these commits when loading a change.
     schema_commit: Option<git2::Oid>,
     /// The OID of the parent commit which points at the identity this change
     /// was authorized with respect to at the time the change was authored.
@@ -87,7 +83,9 @@ pub mod error {
         #[error(transparent)]
         AuthorTrailer(#[from] trailers::error::InvalidAuthorTrailer),
         #[error(transparent)]
-        AuthorizingIdentityTrailer(#[from] super::trailers::error::InvalidAuthorizingIdentityTrailer),
+        AuthorizingIdentityTrailer(
+            #[from] super::trailers::error::InvalidAuthorizingIdentityTrailer,
+        ),
         #[error("non utf-8 characters in commit message")]
         Utf8,
         #[error(transparent)]
@@ -96,7 +94,6 @@ pub mod error {
 }
 
 pub struct NewChangeSpec {
-    pub(crate) schema_commit: git2::Oid,
     pub(crate) typename: TypeName,
     pub(crate) tips: Option<Vec<git2::Oid>>,
     pub(crate) message: Option<String>,
@@ -109,8 +106,8 @@ const CHANGE_BLOB_NAME: &str = "change";
 impl Change {
     /// Create a change in the git repo according to the spec
     pub fn create(
-        authorizing_identity_commit: git2::Oid,
-        author_identity_commit: git2::Oid,
+        authorizing_identity_commit_id: git2::Oid,
+        author_identity_commit_id: git2::Oid,
         repo: &git2::Repository,
         signer: &BoxedSigner,
         spec: NewChangeSpec,
@@ -135,17 +132,54 @@ impl Change {
         tb.insert(CHANGE_BLOB_NAME, change_blob, git2::FileMode::Blob.into())?;
 
         let revision = tb.write()?;
+        let tree = repo.find_tree(revision)?;
 
-        let schema_trailer = trailers::SchemaCommitTrailer::from(spec.schema_commit).into();
+        let author_commit = repo.find_commit(author_identity_commit_id)?;
+        let author = repo.signature()?;
 
-        let mut tips = spec.tips.clone().unwrap_or_default();
-        tips.push(spec.schema_commit);
-        tips.push(authorizing_identity_commit);
+        let authorizing_identity_commit = repo.find_commit(authorizing_identity_commit_id)?;
+
+        let signatures = link_identities::git::sign(signer, revision.into())?.into();
+        let mut parent_commits = spec
+            .tips
+            .iter()
+            .flat_map(|cs| cs.iter())
+            .map(|o| repo.find_commit(*o))
+            .collect::<Result<Vec<git2::Commit>, git2::Error>>()?;
+        parent_commits.push(authorizing_identity_commit);
+        parent_commits.push(author_commit);
+
+        let trailers = vec![
+            super::trailers::AuthorCommitTrailer::from(author_identity_commit_id).into(),
+            super::trailers::AuthorizingIdentityCommitTrailer::from(authorizing_identity_commit_id)
+                .into(),
+        ];
+
+        let commit = repo.commit(
+            None,
+            &author,
+            &author,
+            &link_identities::git::sign::CommitMessage::new(
+                spec.message
+                    .unwrap_or_else(|| "new change".to_string())
+                    .as_str(),
+                &signatures,
+                trailers,
+            )
+            .to_string(),
+            &tree,
+            &(parent_commits.iter().collect::<Vec<&git2::Commit>>())[..],
+        )?;
 
         Ok(Change {
             schema_commit: None,
             manifest,
             contents: spec.contents,
+            commit,
+            signatures,
+            authorizing_identity_commit: authorizing_identity_commit_id,
+            author_commit: author_identity_commit_id,
+            revision,
         })
     }
 
@@ -160,11 +194,17 @@ impl Change {
             super::trailers::AuthorCommitTrailer::try_from(&owned_trailers[..])?;
         let authorizing_identity_trailer =
             super::trailers::AuthorizingIdentityCommitTrailer::try_from(&owned_trailers[..])?;
-        let schema_commit_trailer = match super::trailers::SchemaCommitTrailer::try_from(&owned_trailers[..]) {
-            Ok(t) => Some(t),
-            Err(super::trailers::error::InvalidSchemaTrailer::NoValue) => None,
-            Err(e) => { return Err(e.into()) },
-        };
+
+        // We no longer support schema parents but to remain backwards compatible we
+        // still load the commit trailer so we know to omit the schema parent
+        // commits when evaluating old object histories which still have a
+        // schema parent commit
+        let schema_commit_trailer =
+            match super::trailers::SchemaCommitTrailer::try_from(&owned_trailers[..]) {
+                Ok(t) => Some(t),
+                Err(super::trailers::error::InvalidSchemaTrailer::NoTrailer) => None,
+                Err(e) => return Err(e.into()),
+            };
         let signatures = Signatures::try_from(trailers)?;
 
         let tree = commit.tree()?;
@@ -217,6 +257,10 @@ impl Change {
 
     pub fn contents(&self) -> &EntryContents {
         &self.contents
+    }
+
+    pub fn schema_commit(&self) -> Option<git2::Oid> {
+        self.schema_commit
     }
 
     pub fn authorizing_identity_commit(&self) -> git2::Oid {

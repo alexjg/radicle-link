@@ -18,8 +18,6 @@ pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
-    SchemaParse(#[from] super::schema::error::Parse),
-    #[error(transparent)]
     Git(#[from] git2::Error),
     #[error(transparent)]
     MinicborDecode(#[from] minicbor::decode::Error),
