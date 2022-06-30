@@ -257,21 +257,23 @@ impl Write for Storage {
                         })
                     };
                     match self.reference(&RefString::from(&name))? {
-                        Some(r) => reject_or_update(
-                            previous
-                                .guard(r.target().map(ext::Oid::from).as_ref(), delete)?
-                                .map_or(
-                                    Ok(Updated::Deleted {
-                                        name,
-                                        previous: r
-                                            .target()
-                                            .map(Ok)
-                                            .unwrap_or(Err(error::SymbolicRef))?
-                                            .into(),
-                                    }),
-                                    Err,
-                                ),
-                        ),
+                        Some(r) => {
+                            reject_or_update(
+                                previous
+                                    .guard(r.target().map(ext::Oid::from).as_ref(), delete)?
+                                    .map_or(
+                                        Ok(Updated::Deleted {
+                                            name,
+                                            previous: r
+                                                .target()
+                                                .map(Ok)
+                                                .unwrap_or(Err(error::SymbolicRef))?
+                                                .into(),
+                                        }),
+                                        Err,
+                                    ),
+                            )
+                        },
                         None => match previous {
                             refdb::PreviousValue::Any
                             | refdb::PreviousValue::MustNotExist
