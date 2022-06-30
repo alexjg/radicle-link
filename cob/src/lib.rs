@@ -20,7 +20,7 @@
 //! ## Caching
 //!
 //! When loading a collaborative object we verify that every change in the hash
-//! graph is signed and respects the schema of the object. For repositories with
+//! graph is signed and respects the. For repositories with
 //! a large number of objects, or a smaller number of objects with a large
 //! number of changes, this can become a computationally intensive task. To
 //! avoid recalculating the state of every object every time we make a change
@@ -34,36 +34,25 @@
 //! # Implementation Notes
 //!
 //! This module starts with the basic value types which are part of the public
-//! API: `ObjectId`, `TypeName`, `Schema`, all of which compose a
-//! `CollaborativeObject`. When loading a `CollaborativeObject` we attempt to
-//! load a graph of the automerge changes that make up the object from
-//! references to the object ID in the `RefsStorage` we have been passed. There
-//! are two representations of a change graph. Firstly there is
-//! `change_graph::ChangeGraph`, which is a full directed graph containing all
-//! the commits we can find for the given object. `ChangeGraph`
-//! has an `evaluate` method which traverses this directed graph validating each
-//! change with respect to their signatures, the schema, and the access control
-//! policy (only maintainers may make changes). Secondly there is the
-//! `cache::ThinChangeGraph`, this is a representation that contains only the
-//! automerge history of a fully evaluated change graph and the OIDs of the tips
-//! of the graph that was used to generate the changes. For any of the CRUD
-//! methods we first attempt to load a `ThinChangeGraph` from the cache, and if
-//! that fails (either because there is no cached object at all, or because the
-//! reference to the tips returned by the `RefsStorage` is different to those
-//! that were used to generate the cache) then we fall back to evaluating the
+//! API: `ObjectId`, and `TypeName`, all of which compose a `CollaborativeObject`. When loading a
+//! `CollaborativeObject` we attempt to load a graph of the automerge changes that make up the
+//! object from references to the object ID in the `RefsStorage` we have been passed. There are two
+//! representations of a change graph. Firstly there is `change_graph::ChangeGraph`, which is a
+//! full directed graph containing all the commits we can find for the given object. `ChangeGraph`
+//! has an `evaluate` method which traverses this directed graph validating each change with
+//! respect to their signatures, the schema, and the access control policy (only maintainers may
+//! make changes). Secondly there is the `cache::CachedChangeGraph`, this is a representation that
+//! contains only the automerge history of a fully evaluated change graph and the OIDs of the tips
+//! of the graph that was used to generate the changes. For any of the CRUD methods we first
+//! attempt to load a `CachedChangeGraph` from the cache, and if that fails (either because there is
+//! no cached object at all, or because the reference to the tips returned by the `RefsStorage` is
+//! different to those that were used to generate the cache) then we fall back to evaluating the
 //! full change graph of the object.
 //!
-//! Individual changes within a `ChangeGraph` are represented by a
-//! `change::Change`; whereas changes to a schema (of which we currently only
-//! support a single initial change per object) are represented by a
-//! `schema_change::SchemaChange`. These types both represent commits with a
-//! particular set of trailers and which point to trees containing a particular
-//! set of objects. Both `SchemaChange`s and `Change`s share some common data,
-//! so they are both implemented as extensions to a
-//! `change_metadata::ChangeMetadata`, which encapsulates the common logic.
-//! These types make use of the logic in `trailers`, which defines some
-//! wrapper types around trailers which are `git2::Oid` valued.
-
+//! Individual changes within a `ChangeGraph` are represented by a `change::Change` which
+//! represents commits with a particular set of trailers and which point to trees containing a
+//! particular set of objects. 
+//!
 use std::{cell::RefCell, collections::BTreeSet, convert::TryFrom, fmt, rc::Rc, str::FromStr};
 
 use serde::{Deserialize, Serialize};
