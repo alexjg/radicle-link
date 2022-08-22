@@ -2,3 +2,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 mod git_subprocess;
+mod urn_path;

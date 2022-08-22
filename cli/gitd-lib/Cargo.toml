@@ -45,7 +45,7 @@ path = "../../link-async"
 
 [dependencies.link-git]
 path = "../../link-git"
-features = ["git2"]
+features = ["git2", "tokio"]
 
 [dependencies.link-replication]
 path    = "../../link-replication"

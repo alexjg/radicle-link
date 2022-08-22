@@ -15,10 +15,7 @@ use futures::{
     FutureExt,
 };
 use git2::transport::Service as GitService;
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    process::Child,
-};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use librad::git::storage;
 use link_async::Spawner;
@@ -113,7 +110,7 @@ where
             })?
     };
 
-    let mut child = match git
+    let child = match git
         .arg(".")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -134,6 +131,8 @@ where
         },
     };
 
+    let mut child = link_git::wrapped::wrap(child);
+
     let mut child_stdin = Some(child.stdin.take().unwrap());
     let mut child_stdout = child.stdout.take().unwrap();
     let mut child_stderr = child.stderr.take().unwrap();
@@ -146,7 +145,7 @@ where
                 match input {
                     Some(Message::Data(bytes)) => {
                          if let Some(ref mut child_stdin) = child_stdin {
-                            if let Err(e) = child_stdin.write_all(&bytes[..]).await {
+                            if let Err(e) = child_stdin.write(&bytes[..]).await {
                                 tracing::error!(err=?e, "error sending to child process");
                             };
                          }
@@ -310,7 +309,9 @@ where
     }
 }
 
-async fn kill_child<E>(child: &mut Child) -> Result<(), Error<E>> {
+async fn kill_child<E, P: link_git::wrapped::Process>(
+    child: &mut link_git::wrapped::Wrapped<P>,
+) -> Result<(), Error<E>> {
     match child.kill().await {
         Ok(_) => {
             tracing::info!("successfully killed subprocess");

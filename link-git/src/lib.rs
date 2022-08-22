@@ -12,6 +12,7 @@ pub mod refs;
 pub use refs::db as refdb;
 #[cfg(feature = "git2")]
 pub mod service;
+pub mod wrapped;
 
 pub use git_actor as actor;
 pub use git_hash as hash;

@@ -7,6 +7,9 @@ license = "GPL-3.0-or-later"
 
 description = "Core git types and functionality"
 
+[features]
+tokio = ["dep:tokio"]
+
 [lib]
 doctest = false
 test = false
@@ -30,6 +33,7 @@ tempfile = "3.3"
 thiserror = "1.0.30"
 tracing = "0.1"
 versions = "3.0.2"
+nom = "7.1"
 
 # gitoxide
 git-actor = "^0.6.0"
@@ -61,4 +65,9 @@ features = ["async-client"]
 version = "0.13.24"
 default-features = false
 features = ["vendored-libgit2"]
+optional = true
+
+[dependencies.tokio]
+version = "1.13"
+features = ["process"]
 optional = true

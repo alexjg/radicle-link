@@ -11,6 +11,9 @@ doctest = false
 test = true
 doc = false
 
+[dependencies]
+proptest = "1"
+
 [dependencies.git2]
 version = "0.13.24"
 default-features = false
@@ -27,3 +30,9 @@ path = "../../../test/it-helpers"
 
 [dependencies.radicle-git-ext]
 path = "../../../git-ext"
+
+[dependencies.link-crypto-test]
+path = "../../../link-crypto/t"
+
+[dependencies.link-identities-test]
+path = "../../../link-identities/t"

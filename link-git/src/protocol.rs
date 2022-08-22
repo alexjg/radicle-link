@@ -13,6 +13,7 @@ pub mod packwriter;
 pub mod take;
 pub mod transport;
 pub mod upload_pack;
+pub mod packet_line;
 
 pub use fetch::{fetch, Ref};
 pub use ls::ls_refs;
